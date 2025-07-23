@@ -1,0 +1,34 @@
+spring:
+  application:
+    name: ssew-core
+  datasource:
+    url: jdbc:postgresql://ep-solitary-resonance-a1a704zr-pooler.ap-southeast-1.aws.neon.tech/ssew?user=ssew_owner&password=npg_VpizoCZ6gU2t&sslmode=require&channelBinding=require
+    driver-class-name: org.postgresql.Driver
+  jpa:
+    database-platform: org.hibernate.dialect.PostgreSQLDialect
+    hibernate:
+      ddl-auto: update
+    show-sql: true
+    properties:
+      hibernate:
+        format_sql: true
+
+  data:
+    redis:
+      url: redis://default:Gtqu5iangNRh2LX4094SHIDx8cp6Td7p@redis-19487.c57.us-east-1-4.ec2.redns.redis-cloud.com:19487
+      ssl:
+        enabled: false
+      timeout: 2000ms
+
+  main:
+    banner-mode: off
+
+  security:
+    user:
+      password: ssew1234
+
+server:
+  port: 9000
+
+jwt:
+  secret: SSBhbSBtYWtpbmcgYSBiYWNrZW5kIGluIHNwcmluZyBib290
