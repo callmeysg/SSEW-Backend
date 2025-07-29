@@ -1,12 +1,12 @@
 package com.singhtwenty2.ssew_core.security;
 
-import com.singhtwenty2.ssew_core.data.entity.User;
-import com.singhtwenty2.ssew_core.data.repository.UserRepository;
+import com.singhtwenty2.ssew_core.data.enums.UserRole;
 import com.singhtwenty2.ssew_core.service.JwtService;
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
+import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpHeaders;
 import org.springframework.lang.NonNull;
@@ -19,22 +19,17 @@ import org.springframework.util.StringUtils;
 import org.springframework.web.filter.OncePerRequestFilter;
 
 import java.io.IOException;
+import java.util.ArrayList;
 import java.util.List;
-import java.util.Optional;
+import java.util.Set;
 import java.util.UUID;
-import java.util.stream.Collectors;
 
 @Component
+@RequiredArgsConstructor
 @Slf4j
 public class JwtAuthFilter extends OncePerRequestFilter {
 
     private final JwtService jwtService;
-    private final UserRepository userRepository;
-
-    public JwtAuthFilter(JwtService jwtService, UserRepository userRepository) {
-        this.jwtService = jwtService;
-        this.userRepository = userRepository;
-    }
 
     @Override
     protected void doFilterInternal(
@@ -42,7 +37,6 @@ public class JwtAuthFilter extends OncePerRequestFilter {
             @NonNull HttpServletResponse response,
             @NonNull FilterChain filterChain)
             throws ServletException, IOException {
-
         if (SecurityContextHolder.getContext().getAuthentication() != null) {
             filterChain.doFilter(request, response);
             return;
@@ -64,14 +58,14 @@ public class JwtAuthFilter extends OncePerRequestFilter {
             }
 
             String userId = jwtService.getUserIdFromAccessToken(token);
+            UserRole userRole = jwtService.getUserRoleFromAccessToken(token);
 
-            if (!StringUtils.hasText(userId)) {
+            if (!StringUtils.hasText(userId) || userRole == null) {
                 filterChain.doFilter(request, response);
                 return;
             }
 
-            authenticateUser(userId, request);
-
+            authenticateUser(userId, userRole, request);
         } catch (Exception e) {
             log.debug("Authentication failed: {}", e.getMessage());
             SecurityContextHolder.clearContext();
@@ -80,44 +74,48 @@ public class JwtAuthFilter extends OncePerRequestFilter {
         filterChain.doFilter(request, response);
     }
 
-    private void authenticateUser(String userId, HttpServletRequest request) {
-        Optional<User> userOptional = userRepository.findById(UUID.fromString(userId));
+    private void authenticateUser(
+            String userId,
+            UserRole userRole,
+            HttpServletRequest request) {
+        try {
+            UUID userUuid = UUID.fromString(userId);
+            PrincipalUser principalUser = PrincipalUser
+                    .builder()
+                    .userId(userUuid)
+                    .role(userRole)
+                    .build();
 
-        if (userOptional.isEmpty()) {
-            log.debug("User not found with ID: {}", userId);
-            return;
+            Set<String> permissions = userRole.getPermissions();
+
+            List<SimpleGrantedAuthority> authorities = new ArrayList<>();
+            authorities.add(new SimpleGrantedAuthority("ROLE_" + userRole.name()));
+            authorities.addAll(permissions.stream()
+                    .map(SimpleGrantedAuthority::new)
+                    .toList());
+
+            UsernamePasswordAuthenticationToken authToken = new UsernamePasswordAuthenticationToken(
+                    principalUser,
+                    null,
+                    authorities
+            );
+            authToken.setDetails(new WebAuthenticationDetailsSource().buildDetails(request));
+            SecurityContextHolder.getContext().setAuthentication(authToken);
+
+            log.debug("User authenticated successfully: {} with role: {}", userId, userRole);
+
+        } catch (IllegalArgumentException e) {
+            log.debug("Invalid user ID format: {}", userId);
+        } catch (Exception e) {
+            log.debug("Error during user authentication: {}", e.getMessage());
         }
-
-        User user = userOptional.get();
-
-        if (!user.canLogin()) {
-            log.debug("User cannot login - account inactive or locked: {}", userId);
-            return;
-        }
-
-        List<SimpleGrantedAuthority> authorities = user.getRole().getPermissions()
-                .stream()
-                .map(SimpleGrantedAuthority::new)
-                .collect(Collectors.toList());
-
-        authorities.add(new SimpleGrantedAuthority("ROLE_" + user.getRole().name()));
-
-        UsernamePasswordAuthenticationToken authToken = new UsernamePasswordAuthenticationToken(
-                user,
-                null,
-                authorities
-        );
-
-        authToken.setDetails(new WebAuthenticationDetailsSource().buildDetails(request));
-        SecurityContextHolder.getContext().setAuthentication(authToken);
     }
 
     @Override
     protected boolean shouldNotFilter(HttpServletRequest request) {
         String path = request.getRequestURI();
-        return path.startsWith("/v1/auth/") ||
-                path.startsWith("/v1/public/") ||
-                path.equals("/v1/health") ||
-                path.equals("/actuator/health");
+        return path.startsWith("/v1/public/") ||
+               path.equals("/v1/health") ||
+               path.equals("/actuator/health");
     }
 }

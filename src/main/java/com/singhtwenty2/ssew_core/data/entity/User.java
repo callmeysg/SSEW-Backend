@@ -32,8 +32,8 @@ public class User extends BaseEntity implements UserDetails {
     @Column(name = "name", nullable = false, length = 100)
     private String name;
 
-    @Column(name = "phone_number", nullable = false, unique = true, length = 15)
-    private String phoneNumber;
+    @Column(name = "mobile_number", nullable = false, unique = true, length = 15)
+    private String mobileNumber;
 
     @Column(name = "email", length = 100)
     private String email;
@@ -78,7 +78,7 @@ public class User extends BaseEntity implements UserDetails {
 
     @Override
     public String getUsername() {
-        return phoneNumber;
+        return mobileNumber;
     }
 
     @Override

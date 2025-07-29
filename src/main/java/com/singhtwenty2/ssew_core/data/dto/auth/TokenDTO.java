@@ -1,4 +1,4 @@
-package com.singhtwenty2.ssew_core.data.dto;
+package com.singhtwenty2.ssew_core.data.dto.auth;
 
 import lombok.*;
 
@@ -11,6 +11,6 @@ public class TokenDTO {
     @AllArgsConstructor
     @NoArgsConstructor
     public static class RefreshTokenRequest {
-        private String refreshTokenValue;
+        private String refresh_token_value;
     }
 }

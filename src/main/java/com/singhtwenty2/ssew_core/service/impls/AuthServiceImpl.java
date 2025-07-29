@@ -1,10 +1,10 @@
 package com.singhtwenty2.ssew_core.service.impls;
 
-import com.singhtwenty2.ssew_core.data.dto.LoginDTO.LoginRequest;
-import com.singhtwenty2.ssew_core.data.dto.LoginDTO.LoginResponse;
-import com.singhtwenty2.ssew_core.data.dto.RegisterDTO.RegisterRequest;
-import com.singhtwenty2.ssew_core.data.dto.RegisterDTO.RegisterResponse;
-import com.singhtwenty2.ssew_core.data.dto.common.UserMetadataDTO;
+import com.singhtwenty2.ssew_core.data.dto.auth.LoginDTO.LoginRequest;
+import com.singhtwenty2.ssew_core.data.dto.auth.LoginDTO.LoginResponse;
+import com.singhtwenty2.ssew_core.data.dto.auth.RegisterDTO.RegisterRequest;
+import com.singhtwenty2.ssew_core.data.dto.auth.RegisterDTO.RegisterResponse;
+import com.singhtwenty2.ssew_core.data.dto.auth.common.UserMetadataDTO;
 import com.singhtwenty2.ssew_core.data.entity.RefreshToken;
 import com.singhtwenty2.ssew_core.data.entity.User;
 import com.singhtwenty2.ssew_core.data.enums.UserRole;
@@ -29,7 +29,7 @@ import java.util.Optional;
 import java.util.UUID;
 import java.util.regex.Pattern;
 
-import static com.singhtwenty2.ssew_core.data.dto.TokenDTO.RefreshTokenRequest;
+import static com.singhtwenty2.ssew_core.data.dto.auth.TokenDTO.RefreshTokenRequest;
 
 @Service
 @Slf4j
@@ -49,26 +49,43 @@ public class AuthServiceImpl implements AuthService {
 
     @Override
     public RegisterResponse registerUser(RegisterRequest registerRequest) {
-        log.debug("Starting user registration for phone: {}", registerRequest.getPhone());
+        log.debug("Starting user registration for phone: {}", registerRequest.getMobile_number());
 
         validateRegistrationRequest(registerRequest);
         checkExistingUser(registerRequest);
 
-        User user = createUserFromRequest(registerRequest);
+        User user = createUserFromRequest(registerRequest, UserRole.USER);
         User savedUser = userRepository.save(user);
 
         log.info("User registered successfully with ID: {}", savedUser.getId());
 
         return RegisterResponse.builder()
-                .success(true)
-                .message("Registration successful. Please verify your email and phone number.")
-                .userMetadata(buildUserMetadata(savedUser))
+                .additional_notes("Please verify your email and phone number. You can log in only after verification.")
+                .user_metadata(buildUserMetadata(savedUser))
                 .build();
     }
 
     @Override
-    public LoginResponse loginUser(LoginRequest loginRequest) {
-        log.debug("Login attempt for: {}", loginRequest.getPhone());
+    public RegisterResponse registerAdmin(RegisterRequest registerRequest) {
+        log.debug("Starting admin registration for phone: {}", registerRequest.getMobile_number());
+
+        validateRegistrationRequest(registerRequest);
+        checkExistingUser(registerRequest);
+
+        User user = createUserFromRequest(registerRequest, UserRole.ADMIN);
+        User savedUser = userRepository.save(user);
+
+        log.info("Admin registered successfully with ID: {}", savedUser.getId());
+
+        return RegisterResponse.builder()
+                .additional_notes("You have been registered as an admin. Please verify your email and phone number before logging in.")
+                .user_metadata(buildUserMetadata(savedUser))
+                .build();
+    }
+
+    @Override
+    public LoginResponse login(LoginRequest loginRequest) {
+        log.debug("Login attempt for: {}", loginRequest.getMobile_number());
 
         validateLoginRequest(loginRequest);
 
@@ -84,7 +101,7 @@ public class AuthServiceImpl implements AuthService {
 
         cleanupUserSessions(user);
 
-        String accessToken = jwtService.generateAccessToken(user.getId().toString());
+        String accessToken = jwtService.generateAccessToken(user.getId().toString(), user.getRole().name());
         RefreshToken refreshToken = createRefreshToken(user);
 
         user.recordSuccessfulLogin();
@@ -93,12 +110,11 @@ public class AuthServiceImpl implements AuthService {
         log.info("User logged in successfully: {}", user.getId());
 
         return LoginResponse.builder()
-                .success(true)
-                .message("Login successful.")
-                .tokenType("Bearer")
-                .accessToken(accessToken)
-                .refreshToken(refreshToken.getToken())
-                .userMetadata(buildUserMetadata(user))
+                .additional_notes("Please keep your tokens secure.")
+                .token_type("Bearer")
+                .access_token(accessToken)
+                .refresh_token(refreshToken.getToken())
+                .user_metadata(buildUserMetadata(user))
                 .build();
     }
 
@@ -106,11 +122,11 @@ public class AuthServiceImpl implements AuthService {
     public LoginResponse refreshToken(RefreshTokenRequest refreshTokenRequest) {
         log.debug("Token refresh attempt");
 
-        if (!StringUtils.hasText(refreshTokenRequest.getRefreshTokenValue())) {
+        if (!StringUtils.hasText(refreshTokenRequest.getRefresh_token_value())) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Refresh token is required");
         }
 
-        Optional<RefreshToken> tokenOptional = refreshTokenRepository.findByToken(refreshTokenRequest.getRefreshTokenValue());
+        Optional<RefreshToken> tokenOptional = refreshTokenRepository.findByToken(refreshTokenRequest.getRefresh_token_value());
 
         if (tokenOptional.isEmpty()) {
             throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "Invalid refresh token");
@@ -132,7 +148,7 @@ public class AuthServiceImpl implements AuthService {
             throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Account access denied");
         }
 
-        String newAccessToken = jwtService.generateAccessToken(user.getId().toString());
+        String newAccessToken = jwtService.generateAccessToken(user.getId().toString(), user.getRole().name());
 
         refreshToken.setUpdatedAt(LocalDateTime.now());
         refreshTokenRepository.save(refreshToken);
@@ -140,12 +156,11 @@ public class AuthServiceImpl implements AuthService {
         log.info("Token refreshed successfully for user: {}", user.getId());
 
         return LoginResponse.builder()
-                .success(true)
-                .message("Token refreshed successfully")
-                .accessToken(newAccessToken)
-                .refreshToken(refreshTokenRequest.getRefreshTokenValue())
-                .tokenType("Bearer")
-                .userMetadata(buildUserMetadata(user))
+                .additional_notes("Your access token has been refreshed successfully.")
+                .access_token(newAccessToken)
+                .refresh_token(refreshTokenRequest.getRefresh_token_value())
+                .token_type("Bearer")
+                .user_metadata(buildUserMetadata(user))
                 .build();
     }
 
@@ -153,8 +168,8 @@ public class AuthServiceImpl implements AuthService {
     public void logout(RefreshTokenRequest refreshTokenRequest) {
         log.debug("Logout attempt");
 
-        if (StringUtils.hasText(refreshTokenRequest.getRefreshTokenValue())) {
-            Optional<RefreshToken> tokenOptional = refreshTokenRepository.findByToken(refreshTokenRequest.getRefreshTokenValue());
+        if (StringUtils.hasText(refreshTokenRequest.getRefresh_token_value())) {
+            Optional<RefreshToken> tokenOptional = refreshTokenRepository.findByToken(refreshTokenRequest.getRefresh_token_value());
             tokenOptional.ifPresent(token -> {
                 token.revoke();
                 refreshTokenRepository.save(token);
@@ -179,7 +194,7 @@ public class AuthServiceImpl implements AuthService {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Name must be at least 2 characters long");
         }
 
-        if (!StringUtils.hasText(request.getPhone()) || !PHONE_PATTERN.matcher(request.getPhone()).matches()) {
+        if (!StringUtils.hasText(request.getMobile_number()) || !PHONE_PATTERN.matcher(request.getMobile_number()).matches()) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Invalid phone number format");
         }
 
@@ -194,23 +209,23 @@ public class AuthServiceImpl implements AuthService {
     }
 
     private void checkExistingUser(RegisterRequest request) {
-        if (userRepository.findByPhoneNumber(request.getPhone()).isPresent()) {
+        if (userRepository.findByMobileNumber(request.getMobile_number()).isPresent()) {
             throw new ResponseStatusException(HttpStatus.CONFLICT, "Phone number already registered");
         }
 
         if (StringUtils.hasText(request.getEmail()) &&
-                userRepository.findByEmail(request.getEmail()).isPresent()) {
+            userRepository.findByEmail(request.getEmail()).isPresent()) {
             throw new ResponseStatusException(HttpStatus.CONFLICT, "Email already registered");
         }
     }
 
-    private User createUserFromRequest(RegisterRequest request) {
+    private User createUserFromRequest(RegisterRequest request, UserRole role) {
         User user = new User();
         user.setName(request.getName().trim());
-        user.setPhoneNumber(request.getPhone());
+        user.setMobileNumber(request.getMobile_number());
         user.setEmail(StringUtils.hasText(request.getEmail()) ? request.getEmail().toLowerCase() : null);
         user.setPassword(encoderService.encode(request.getPassword()));
-        user.setRole(request.getRole() != null ? request.getRole() : UserRole.USER);
+        user.setRole(role);
         user.setIsEmailVerified(false);
         user.setIsMobileVerified(false);
         user.setIsAccountLocked(false);
@@ -223,7 +238,7 @@ public class AuthServiceImpl implements AuthService {
     }
 
     private void validateLoginRequest(LoginRequest request) {
-        if (!StringUtils.hasText(request.getPhone()) || !PHONE_PATTERN.matcher(request.getPhone()).matches()) {
+        if (!StringUtils.hasText(request.getMobile_number()) || !PHONE_PATTERN.matcher(request.getMobile_number()).matches()) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Phone number is required");
         }
 
@@ -233,7 +248,7 @@ public class AuthServiceImpl implements AuthService {
     }
 
     private User authenticateUser(LoginRequest request) {
-        Optional<User> userOptional = userRepository.findByPhoneNumber(request.getPhone());
+        Optional<User> userOptional = userRepository.findByMobileNumber(request.getMobile_number());
 
         if (userOptional.isEmpty()) {
             throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "Invalid credentials");
@@ -308,7 +323,7 @@ public class AuthServiceImpl implements AuthService {
     }
 
     private RefreshToken createRefreshToken(User user) {
-        String tokenValue = jwtService.generateRefreshToken(user.getId().toString());
+        String tokenValue = jwtService.generateRefreshToken(user.getId().toString(), user.getRole().name());
 
         RefreshToken refreshToken = new RefreshToken();
         refreshToken.setToken(tokenValue);
@@ -330,16 +345,17 @@ public class AuthServiceImpl implements AuthService {
 
     private UserMetadataDTO buildUserMetadata(User user) {
         return UserMetadataDTO.builder()
-                .userId(user.getId().toString())
+                .user_id(user.getId().toString())
                 .name(user.getName())
-                .phone(user.getPhoneNumber())
+                .phone(user.getMobileNumber())
                 .email(user.getEmail())
-                .isEmailVerified(user.getIsEmailVerified())
-                .isPhoneVerified(user.getIsMobileVerified())
-                .failedLoginAttempts(user.getFailedLoginAttempts())
-                .lastLoginTime(user.getLastLoginTime() != null ? user.getLastLoginTime().toString() : null)
-                .createdAt(user.getCreatedAt().toString())
-                .updatedAt(user.getUpdatedAt().toString())
+                .role(user.getRole().name())
+                .is_email_verified(user.getIsEmailVerified())
+                .is_phone_verified(user.getIsMobileVerified())
+                .failed_login_attempts(user.getFailedLoginAttempts())
+                .last_login_time(user.getLastLoginTime() != null ? user.getLastLoginTime().toString() : null)
+                .created_at(user.getCreatedAt().toString())
+                .updated_at(user.getUpdatedAt().toString())
                 .version(user.getVersion())
                 .build();
     }

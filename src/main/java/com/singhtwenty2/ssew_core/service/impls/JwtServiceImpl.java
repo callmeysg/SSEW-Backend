@@ -1,5 +1,6 @@
 package com.singhtwenty2.ssew_core.service.impls;
 
+import com.singhtwenty2.ssew_core.data.enums.UserRole;
 import com.singhtwenty2.ssew_core.service.JwtService;
 import io.jsonwebtoken.Claims;
 import io.jsonwebtoken.ExpiredJwtException;
@@ -16,6 +17,9 @@ import org.springframework.web.server.ResponseStatusException;
 import javax.crypto.SecretKey;
 import java.util.Base64;
 import java.util.Date;
+
+import static com.singhtwenty2.ssew_core.constants.AuthConstants.TokenType.ACCESS_TOKEN;
+import static com.singhtwenty2.ssew_core.constants.AuthConstants.TokenType.REFRESH_TOKEN;
 
 @Service
 @Slf4j
@@ -45,9 +49,13 @@ public class JwtServiceImpl implements JwtService {
     }
 
     @Override
-    public String generateToken(String userId, String type, Long expiry) {
+    public String generateToken(String userId, String role, String type, Long expiry) {
         if (!StringUtils.hasText(userId)) {
             throw new IllegalArgumentException("User ID cannot be null or empty");
+        }
+
+        if (!StringUtils.hasText(role)) {
+            throw new IllegalArgumentException("User role cannot be null or empty");
         }
 
         if (!StringUtils.hasText(type)) {
@@ -58,12 +66,19 @@ public class JwtServiceImpl implements JwtService {
             throw new IllegalArgumentException("Expiry must be positive");
         }
 
+        try {
+            UserRole.valueOf(role.toUpperCase());
+        } catch (IllegalArgumentException e) {
+            throw new IllegalArgumentException("Invalid user role: " + role);
+        }
+
         Date now = new Date();
         Date expiryDate = new Date(now.getTime() + expiry);
 
         return Jwts.builder()
                 .subject(userId)
                 .claim("type", type)
+                .claim("role", role.toUpperCase())
                 .claim("iat", now.getTime() / 1000)
                 .issuedAt(now)
                 .expiration(expiryDate)
@@ -72,23 +87,18 @@ public class JwtServiceImpl implements JwtService {
     }
 
     @Override
-    public String generateAccessToken(String userId) {
-        return generateToken(userId, "accessToken", accessTokenValidityMs);
+    public String generateAccessToken(String userId, String role) {
+        return generateToken(userId, role, ACCESS_TOKEN, accessTokenValidityMs);
     }
 
     @Override
-    public String generateRefreshToken(String userId) {
-        return generateToken(userId, "refreshToken", refreshTokenValidityMs);
+    public String generateRefreshToken(String userId, String role) {
+        return generateToken(userId, role, REFRESH_TOKEN, refreshTokenValidityMs);
     }
 
     @Override
     public boolean validateAccessToken(String token) {
-        return validateTokenByType(token, "accessToken");
-    }
-
-    @Override
-    public boolean validateRefreshToken(String token) {
-        return validateTokenByType(token, "refreshToken");
+        return validateTokenByType(token, ACCESS_TOKEN);
     }
 
     @Override
@@ -102,7 +112,7 @@ public class JwtServiceImpl implements JwtService {
         }
 
         String tokenType = (String) claims.get("type");
-        if (!"accessToken".equals(tokenType)) {
+        if (!ACCESS_TOKEN.equals(tokenType)) {
             throw new ResponseStatusException(
                     HttpStatus.UNAUTHORIZED,
                     "Invalid token type"
@@ -112,32 +122,39 @@ public class JwtServiceImpl implements JwtService {
         return claims.getSubject();
     }
 
-    public String getUserIdFromRefreshToken(String token) {
+    @Override
+    public UserRole getUserRoleFromAccessToken(String token) {
         Claims claims = parseAllClaims(token);
         if (claims == null) {
             throw new ResponseStatusException(
                     HttpStatus.UNAUTHORIZED,
-                    "Invalid or expired refresh token"
+                    "Invalid or expired access token"
             );
         }
 
         String tokenType = (String) claims.get("type");
-        if (!"refreshToken".equals(tokenType)) {
+        if (!ACCESS_TOKEN.equals(tokenType)) {
             throw new ResponseStatusException(
                     HttpStatus.UNAUTHORIZED,
-                    "Invalid token type"
+                    "Invalid token type - expected access token"
             );
         }
 
-        return claims.getSubject();
-    }
+        String roleString = (String) claims.get("role");
+        if (!StringUtils.hasText(roleString)) {
+            throw new ResponseStatusException(
+                    HttpStatus.UNAUTHORIZED,
+                    "Token missing role information"
+            );
+        }
 
-    public boolean isTokenExpired(String token) {
         try {
-            Claims claims = parseAllClaims(token);
-            return claims == null || claims.getExpiration().before(new Date());
-        } catch (ExpiredJwtException e) {
-            return true;
+            return UserRole.valueOf(roleString.toUpperCase());
+        } catch (IllegalArgumentException e) {
+            throw new ResponseStatusException(
+                    HttpStatus.UNAUTHORIZED,
+                    "Invalid role in token: " + roleString
+            );
         }
     }
 

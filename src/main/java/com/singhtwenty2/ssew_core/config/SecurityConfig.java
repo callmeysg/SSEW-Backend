@@ -4,6 +4,10 @@ import com.singhtwenty2.ssew_core.security.JwtAuthFilter;
 import lombok.RequiredArgsConstructor;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.http.HttpMethod;
+import org.springframework.security.authentication.AuthenticationManager;
+import org.springframework.security.config.annotation.authentication.configuration.AuthenticationConfiguration;
+import org.springframework.security.config.annotation.method.configuration.EnableMethodSecurity;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
 import org.springframework.security.config.annotation.web.configurers.AbstractHttpConfigurer;
@@ -18,6 +22,7 @@ import java.util.Arrays;
 
 @Configuration
 @EnableWebSecurity
+@EnableMethodSecurity
 @RequiredArgsConstructor
 public class SecurityConfig {
 
@@ -29,7 +34,6 @@ public class SecurityConfig {
                 .cors(cors -> cors.configurationSource(corsConfigurationSource()))
                 .csrf(AbstractHttpConfigurer::disable)
                 .authorizeHttpRequests(auth -> auth
-                        // Public endpoints - no authentication required
                         .requestMatchers(
                                 "/v1/auth/**",           // All auth endpoints
                                 "/v1/public/**",         // Public API endpoints
@@ -43,6 +47,24 @@ public class SecurityConfig {
                                 "/error"                 // Error handling
                         ).permitAll()
 
+                        // Category GET endpoints (public access)
+                        .requestMatchers(HttpMethod.GET, "/v1/categories").permitAll()                    // Get all categories
+                        .requestMatchers(HttpMethod.GET, "/v1/categories/*").permitAll()                  // Get category by ID
+                        .requestMatchers(HttpMethod.GET, "/v1/categories/slug/*").permitAll()             // Get category by slug
+                        .requestMatchers(HttpMethod.GET, "/v1/categories/active").permitAll()             // Get active categories
+                        .requestMatchers(HttpMethod.GET, "/v1/categories/search").permitAll()             // Search categories
+                        .requestMatchers(HttpMethod.GET, "/v1/categories/active/ordered").permitAll()     // Get active categories ordered
+
+                        // Brand GET endpoints (public access)
+                        .requestMatchers(HttpMethod.GET, "/v1/brands").permitAll()                        // Get all brands
+                        .requestMatchers(HttpMethod.GET, "/v1/brands/*").permitAll()                      // Get brand by ID
+                        .requestMatchers(HttpMethod.GET, "/v1/brands/slug/*").permitAll()                 // Get brand by slug
+                        .requestMatchers(HttpMethod.GET, "/v1/brands/active").permitAll()                 // Get active brands
+                        .requestMatchers(HttpMethod.GET, "/v1/brands/category/*").permitAll()             // Get brands by category
+                        .requestMatchers(HttpMethod.GET, "/v1/brands/category/*/active").permitAll()      // Get active brands by category
+                        .requestMatchers(HttpMethod.GET, "/v1/brands/category/*/ordered").permitAll()     // Get brands by category ordered
+                        .requestMatchers(HttpMethod.GET, "/v1/brands/search").permitAll()                 // Search brands
+
                         .anyRequest().authenticated()
                 )
                 .sessionManagement(session ->
@@ -53,12 +75,17 @@ public class SecurityConfig {
     }
 
     @Bean
+    public AuthenticationManager authenticationManager(AuthenticationConfiguration config) throws Exception {
+        return config.getAuthenticationManager();
+    }
+
+    @Bean
     public CorsConfigurationSource corsConfigurationSource() {
         CorsConfiguration configuration = new CorsConfiguration();
 
         configuration.setAllowedOriginPatterns(Arrays.asList(
-                "http://localhost:3000",           // Local development
-                "http://localhost:5173",           // Vite dev server
+                "http://localhost:3000",    // Local development
+                "http://localhost:5173",    // Vite dev server
                 "https://ssew.com",         // Production frontend domain
                 "https://www.ssew.com",     // Production frontend domain with www
                 "https://*.ssew.com"        // Subdomains if needed

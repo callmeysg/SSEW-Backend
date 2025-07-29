@@ -1,7 +1,6 @@
-package com.singhtwenty2.ssew_core.data.dto;
+package com.singhtwenty2.ssew_core.data.dto.auth;
 
-import com.singhtwenty2.ssew_core.data.dto.common.UserMetadataDTO;
-import com.singhtwenty2.ssew_core.data.enums.UserRole;
+import com.singhtwenty2.ssew_core.data.dto.auth.common.UserMetadataDTO;
 import lombok.*;
 
 public class RegisterDTO {
@@ -14,10 +13,9 @@ public class RegisterDTO {
     @NoArgsConstructor
     public static class RegisterRequest {
         private String name;
-        private String phone;
+        private String mobile_number;
         private String email;
         private String password;
-        private UserRole role;
     }
 
     @Setter
@@ -27,8 +25,7 @@ public class RegisterDTO {
     @AllArgsConstructor
     @NoArgsConstructor
     public static class RegisterResponse {
-        private Boolean success;
-        private String message;
-        private UserMetadataDTO userMetadata;
+        private String additional_notes;
+        private UserMetadataDTO user_metadata;
     }
 }

@@ -1,4 +1,4 @@
-package com.singhtwenty2.ssew_core.data.dto;
+package com.singhtwenty2.ssew_core.data.dto.auth;
 
 import lombok.AllArgsConstructor;
 import lombok.Builder;
@@ -16,7 +16,7 @@ import java.util.Map;
 public class AuthHealthResponse {
 
     private String status;
-    private String serviceName;
+    private String service_name;
     private String version;
     private LocalDateTime timestamp;
     private long uptime;
@@ -24,7 +24,7 @@ public class AuthHealthResponse {
     private SecurityHealth security;
     private EndpointHealth endpoints;
     private SystemHealth system;
-    private ActiveSessions activeSessions;
+    private ActiveSessions active_sessions;
 
     @Data
     @Builder
@@ -32,11 +32,11 @@ public class AuthHealthResponse {
     @AllArgsConstructor
     public static class DatabaseHealth {
         private String status;
-        private long connectionPoolSize;
-        private long activeConnections;
-        private long idleConnections;
-        private double responseTime;
-        private boolean canConnect;
+        private long connection_pool_size;
+        private long active_connections;
+        private long idle_connections;
+        private double response_time;
+        private boolean can_connect;
     }
 
     @Data
@@ -44,11 +44,11 @@ public class AuthHealthResponse {
     @NoArgsConstructor
     @AllArgsConstructor
     public static class SecurityHealth {
-        private String jwtStatus;
-        private boolean tokenValidationWorking;
-        private long tokenCacheSize;
-        private boolean refreshTokenServiceActive;
-        private String encryptionStatus;
+        private String jwt_status;
+        private boolean token_validation_working;
+        private long token_cache_size;
+        private boolean refresh_token_service_active;
+        private String encryption_status;
     }
 
     @Data
@@ -57,10 +57,10 @@ public class AuthHealthResponse {
     @AllArgsConstructor
     public static class EndpointHealth {
         private List<EndpointInfo> endpoints;
-        private long totalRequests;
-        private long successfulRequests;
-        private long failedRequests;
-        private double successRate;
+        private long total_requests;
+        private long successful_requests;
+        private long failed_requests;
+        private double success_rate;
 
         @Data
         @Builder
@@ -70,9 +70,9 @@ public class AuthHealthResponse {
             private String path;
             private String method;
             private String status;
-            private long requestCount;
-            private double averageResponseTime;
-            private long lastAccessTime;
+            private long request_count;
+            private double average_response_time;
+            private long last_access_time;
         }
     }
 
@@ -82,21 +82,21 @@ public class AuthHealthResponse {
     @AllArgsConstructor
     public static class SystemHealth {
         private MemoryInfo memory;
-        private String jvmVersion;
-        private long threadCount;
-        private String osName;
-        private String osVersion;
+        private String jvm_version;
+        private long thread_count;
+        private String os_name;
+        private String os_version;
 
         @Data
         @Builder
         @NoArgsConstructor
         @AllArgsConstructor
         public static class MemoryInfo {
-            private long totalMemory;
-            private long freeMemory;
-            private long usedMemory;
-            private long maxMemory;
-            private double memoryUsagePercentage;
+            private long total_memory;
+            private long free_memory;
+            private long used_memory;
+            private long max_memory;
+            private double memory_usage_percentage;
         }
     }
 
@@ -105,10 +105,10 @@ public class AuthHealthResponse {
     @NoArgsConstructor
     @AllArgsConstructor
     public static class ActiveSessions {
-        private long totalActiveSessions;
-        private long totalRegisteredUsers;
-        private long sessionsLast24Hours;
-        private long registrationsLast24Hours;
-        private Map<String, Long> sessionsByDevice;
+        private long total_active_sessions;
+        private long total_registered_users;
+        private long sessions_last_24_hours;
+        private long registrations_last_24_hours;
+        private Map<String, Long> sessions_by_device;
     }
 }

@@ -19,11 +19,11 @@ public interface UserRepository extends JpaRepository<User, UUID> {
 
     Optional<User> findByEmail(String email);
 
-    Optional<User> findByPhoneNumber(String phoneNumber);
+    Optional<User> findByMobileNumber(String phoneNumber);
 
     boolean existsByEmail(String email);
 
-    boolean existsByPhoneNumber(String phoneNumber);
+    boolean existsByMobileNumber(String phoneNumber);
 
     Page<User> findByRole(UserRole role, Pageable pageable);
 
