@@ -11,6 +11,6 @@ public class TokenDTO {
     @AllArgsConstructor
     @NoArgsConstructor
     public static class RefreshTokenRequest {
-        private String refresh_token_value;
+        private String refreshTokenValue;
     }
 }

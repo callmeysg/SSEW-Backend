@@ -18,19 +18,19 @@ public class ProductImageDTO {
 
         @NotBlank(message = "Image URL is required")
         @Size(max = 500, message = "Image URL must not exceed 500 characters")
-        private String image_url;
+        private String imageUrl;
 
         @Size(max = 200, message = "Alt text must not exceed 200 characters")
-        private String alt_text;
+        private String altText;
 
-        private Boolean is_thumbnail = false;
+        private Boolean isThumbnail = false;
 
-        private Integer display_order = 0;
+        private Integer displayOrder = 0;
 
-        private Long file_size;
+        private Long fileSize;
 
         @Size(max = 10, message = "File format must not exceed 10 characters")
-        private String file_format;
+        private String fileFormat;
 
         @Min(value = 1, message = "Width must be greater than 0")
         private Integer width;
@@ -39,7 +39,7 @@ public class ProductImageDTO {
         private Integer height;
 
         @NotNull(message = "Product ID is required")
-        private String product_id;
+        private String productId;
     }
 
     @Setter
@@ -51,19 +51,19 @@ public class ProductImageDTO {
     public static class UpdateProductImageRequest {
 
         @Size(max = 500, message = "Image URL must not exceed 500 characters")
-        private String image_url;
+        private String imageUrl;
 
         @Size(max = 200, message = "Alt text must not exceed 200 characters")
-        private String alt_text;
+        private String altText;
 
-        private Boolean is_thumbnail;
+        private Boolean isThumbnail;
 
-        private Integer display_order;
+        private Integer displayOrder;
 
-        private Long file_size;
+        private Long fileSize;
 
         @Size(max = 10, message = "File format must not exceed 10 characters")
-        private String file_format;
+        private String fileFormat;
 
         @Min(value = 1, message = "Width must be greater than 0")
         private Integer width;
@@ -79,17 +79,17 @@ public class ProductImageDTO {
     @AllArgsConstructor
     @NoArgsConstructor
     public static class ProductImageResponse {
-        private String image_id;
-        private String image_url;
-        private String alt_text;
-        private Boolean is_thumbnail;
-        private Integer display_order;
-        private Long file_size;
-        private String file_format;
+        private String imageId;
+        private String imageUrl;
+        private String altText;
+        private Boolean isThumbnail;
+        private Integer displayOrder;
+        private Long fileSize;
+        private String fileFormat;
         private Integer width;
         private Integer height;
-        private String created_at;
-        private String updated_at;
-        private String product_id;
+        private String createdAt;
+        private String updatedAt;
+        private String productId;
     }
 }

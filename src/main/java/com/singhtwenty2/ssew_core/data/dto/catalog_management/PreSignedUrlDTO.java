@@ -13,10 +13,10 @@ public class PreSignedUrlDTO {
     @AllArgsConstructor
     @NoArgsConstructor
     public static class PresignedUrlRequest {
-        private String file_name;
-        private String content_type;
-        private String document_type;
-        private String entity_type;
+        private String fileName;
+        private String contentType;
+        private String documentType;
+        private String entityType;
     }
 
     @Setter
@@ -26,11 +26,11 @@ public class PreSignedUrlDTO {
     @AllArgsConstructor
     @NoArgsConstructor
     public static class PresignedUrlResponse {
-        private String presigned_url;
-        private String object_key;
-        private String s3_url;
-        private String document_type;
-        private long expires_in;
+        private String presignedUrl;
+        private String objectKey;
+        private String s3Url;
+        private String documentType;
+        private long expiresIn;
     }
 
     @Setter
@@ -50,6 +50,6 @@ public class PreSignedUrlDTO {
     @AllArgsConstructor
     @NoArgsConstructor
     public static class BatchPresignedUrlResponse {
-        private List<PresignedUrlResponse> presigned_urls;
+        private List<PresignedUrlResponse> presignedUrls;
     }
 }

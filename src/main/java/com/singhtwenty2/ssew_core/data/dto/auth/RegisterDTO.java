@@ -13,7 +13,7 @@ public class RegisterDTO {
     @NoArgsConstructor
     public static class RegisterRequest {
         private String name;
-        private String mobile_number;
+        private String mobileNumber;
         private String email;
         private String password;
     }
@@ -25,7 +25,7 @@ public class RegisterDTO {
     @AllArgsConstructor
     @NoArgsConstructor
     public static class RegisterResponse {
-        private String additional_notes;
-        private UserMetadataDTO user_metadata;
+        private String additionalNotes;
+        private UserMetadataDTO userMetadata;
     }
 }

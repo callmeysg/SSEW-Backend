@@ -43,7 +43,7 @@ public class CategoryController {
 
         CategoryResponse response = categoryService.createCategory(createRequest);
 
-        log.info("Category created successfully with ID: {}", response.getCategory_id());
+        log.info("Category created successfully with ID: {}", response.getCategoryId());
 
         return ResponseEntity.status(HttpStatus.CREATED).body(
                 GlobalApiResponse.<CategoryResponse>builder()

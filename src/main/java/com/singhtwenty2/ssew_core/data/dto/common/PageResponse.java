@@ -16,24 +16,24 @@ public class PageResponse<T> {
     private List<T> content;
     private int index;
     private int limit;
-    private long total_elements;
-    private int total_pages;
+    private long totalElements;
+    private int totalPages;
     private boolean first;
     private boolean last;
     private boolean empty;
-    private int number_of_elements;
+    private int numberOfElements;
 
     public static <T> PageResponse<T> from(Page<T> page) {
         return PageResponse.<T>builder()
                 .content(page.getContent())
                 .index(page.getNumber())
                 .limit(page.getSize())
-                .total_elements(page.getTotalElements())
-                .total_pages(page.getTotalPages())
+                .totalElements(page.getTotalElements())
+                .totalPages(page.getTotalPages())
                 .first(page.isFirst())
                 .last(page.isLast())
                 .empty(page.isEmpty())
-                .number_of_elements(page.getNumberOfElements())
+                .numberOfElements(page.getNumberOfElements())
                 .build();
     }
 }

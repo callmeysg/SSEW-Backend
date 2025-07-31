@@ -5,6 +5,7 @@ import com.singhtwenty2.ssew_core.data.dto.catalog_management.BrandDTO.BrandResp
 import com.singhtwenty2.ssew_core.data.dto.catalog_management.BrandDTO.UpdateBrandRequest;
 import com.singhtwenty2.ssew_core.data.dto.common.GlobalApiResponse;
 import com.singhtwenty2.ssew_core.data.dto.common.PageResponse;
+import com.singhtwenty2.ssew_core.service.BrandImageService;
 import com.singhtwenty2.ssew_core.service.BrandService;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
@@ -18,6 +19,7 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.web.multipart.MultipartFile;
 
 import java.util.List;
 import java.util.Map;
@@ -31,6 +33,7 @@ import static com.singhtwenty2.ssew_core.util.io.NetworkUtils.getClientIP;
 public class BrandController {
 
     private final BrandService brandService;
+    private final BrandImageService brandImageService;
 
     @PostMapping
     @PreAuthorize("hasRole('ADMIN')")
@@ -43,7 +46,7 @@ public class BrandController {
 
         BrandResponse response = brandService.createBrand(createRequest);
 
-        log.info("Brand created successfully with ID: {}", response.getBrand_id());
+        log.info("Brand created successfully with ID: {}", response.getBrandId());
 
         return ResponseEntity.status(HttpStatus.CREATED).body(
                 GlobalApiResponse.<BrandResponse>builder()
@@ -303,6 +306,58 @@ public class BrandController {
                         .success(true)
                         .message("Brand status toggled successfully")
                         .data(null)
+                        .build()
+        );
+    }
+
+    @PutMapping("/{brandId}/logo")
+    @PreAuthorize("hasRole('ADMIN')")
+    public ResponseEntity<GlobalApiResponse<BrandResponse>> manageBrandLogo(
+            @PathVariable String brandId,
+            @RequestParam("logoFile") MultipartFile logoFile,
+            HttpServletRequest request
+    ) {
+        log.info("Brand logo management attempt from IP: {} for brand ID: {}", getClientIP(request), brandId);
+
+        if (!brandImageService.validateBrandLogoFile(logoFile)) {
+            return ResponseEntity.badRequest().body(
+                    GlobalApiResponse.<BrandResponse>builder()
+                            .success(false)
+                            .message("Invalid logo file format or size")
+                            .data(null)
+                            .build()
+            );
+        }
+
+        BrandResponse existingBrand = brandService.getBrandById(brandId);
+        String existingObjectKey = existingBrand.getLogoInfo() != null ? existingBrand.getLogoInfo().getObjectKey() : null;
+
+        UpdateBrandRequest updateRequest = new UpdateBrandRequest();
+        updateRequest.setLogoFile(logoFile);
+
+        if (existingObjectKey != null) {
+            updateRequest.setRemoveLogo(false);
+        }
+
+        BrandResponse updatedBrand = brandService.updateBrand(brandId, updateRequest);
+
+        if (updatedBrand.getLogoInfo() == null) {
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(
+                    GlobalApiResponse.<BrandResponse>builder()
+                            .success(false)
+                            .message("Failed to process brand logo")
+                            .data(null)
+                            .build()
+            );
+        }
+
+        log.info("Brand logo managed successfully for brand ID: {}", brandId);
+
+        return ResponseEntity.ok(
+                GlobalApiResponse.<BrandResponse>builder()
+                        .success(true)
+                        .message("Brand logo managed successfully")
+                        .data(updatedBrand)
                         .build()
         );
     }

@@ -54,7 +54,7 @@ public class AuthHealthService implements HealthIndicator {
     public AuthHealthResponse getDetailedHealthInfo() {
         return AuthHealthResponse.builder()
                 .status(determineOverallStatus())
-                .service_name("SSEW Auth Service")
+                .serviceName("SSEW Auth Service")
                 .version(getServiceVersion())
                 .timestamp(LocalDateTime.now())
                 .uptime(getUptimeInSeconds())
@@ -62,7 +62,7 @@ public class AuthHealthService implements HealthIndicator {
                 .security(getSecurityHealth())
                 .endpoints(getEndpointHealth())
                 .system(getSystemHealth())
-                .active_sessions(getActiveSessionsInfo())
+                .activeSessions(getActiveSessionsInfo())
                 .build();
     }
 
@@ -94,17 +94,17 @@ public class AuthHealthService implements HealthIndicator {
 
             return DatabaseHealth.builder()
                     .status(canConnect ? "UP" : "DOWN")
-                    .connection_pool_size(getConnectionPoolSize())
-                    .active_connections(getActiveConnections())
-                    .idle_connections(getIdleConnections())
-                    .response_time(responseTime)
-                    .can_connect(canConnect)
+                    .connectionPoolSize(getConnectionPoolSize())
+                    .activeConnections(getActiveConnections())
+                    .idleConnections(getIdleConnections())
+                    .responseTime(responseTime)
+                    .canConnect(canConnect)
                     .build();
         } catch (Exception e) {
             return DatabaseHealth.builder()
                     .status("DOWN")
-                    .can_connect(false)
-                    .response_time(-1)
+                    .canConnect(false)
+                    .responseTime(-1)
                     .build();
         }
     }
@@ -114,11 +114,11 @@ public class AuthHealthService implements HealthIndicator {
         boolean refreshTokenWorking = testRefreshTokenService();
 
         return SecurityHealth.builder()
-                .jwt_status(jwtWorking ? "UP" : "DOWN")
-                .token_validation_working(jwtWorking)
-                .token_cache_size(getTokenCacheSize())
-                .refresh_token_service_active(refreshTokenWorking)
-                .encryption_status(testEncryption() ? "UP" : "DOWN")
+                .jwtStatus(jwtWorking ? "UP" : "DOWN")
+                .tokenValidationWorking(jwtWorking)
+                .tokenCacheSize(getTokenCacheSize())
+                .refreshTokenServiceActive(refreshTokenWorking)
+                .encryptionStatus(testEncryption() ? "UP" : "DOWN")
                 .build();
     }
 
@@ -149,10 +149,10 @@ public class AuthHealthService implements HealthIndicator {
 
         return EndpointHealth.builder()
                 .endpoints(endpoints)
-                .total_requests(totalRequests)
-                .successful_requests(successfulRequests)
-                .failed_requests(failedRequests)
-                .success_rate(Math.round(successRate * 100.0) / 100.0)
+                .totalRequests(totalRequests)
+                .successfulRequests(successfulRequests)
+                .failedRequests(failedRequests)
+                .successRate(Math.round(successRate * 100.0) / 100.0)
                 .build();
     }
 
@@ -168,29 +168,29 @@ public class AuthHealthService implements HealthIndicator {
         double memoryUsagePercentage = (double) usedMemory / maxMemory * 100;
 
         SystemHealth.MemoryInfo memoryInfo = SystemHealth.MemoryInfo.builder()
-                .total_memory(totalMemory)
-                .free_memory(freeMemory)
-                .used_memory(usedMemory)
-                .max_memory(maxMemory)
-                .memory_usage_percentage(Math.round(memoryUsagePercentage * 100.0) / 100.0)
+                .totalMemory(totalMemory)
+                .freeMemory(freeMemory)
+                .usedMemory(usedMemory)
+                .maxMemory(maxMemory)
+                .memoryUsagePercentage(Math.round(memoryUsagePercentage * 100.0) / 100.0)
                 .build();
 
         return SystemHealth.builder()
                 .memory(memoryInfo)
-                .jvm_version(System.getProperty("java.version"))
-                .thread_count(Thread.activeCount())
-                .os_name(System.getProperty("os.name"))
-                .os_version(System.getProperty("os.version"))
+                .jvmVersion(System.getProperty("java.version"))
+                .threadCount(Thread.activeCount())
+                .osName(System.getProperty("os.name"))
+                .osVersion(System.getProperty("os.version"))
                 .build();
     }
 
     private ActiveSessions getActiveSessionsInfo() {
         return ActiveSessions.builder()
-                .total_active_sessions(getTotalActiveSessions())
-                .total_registered_users(getTotalRegisteredUsers())
-                .sessions_last_24_hours(getSessionsLast24Hours())
-                .registrations_last_24_hours(getRegistrationsLast24Hours())
-                .sessions_by_device(getSessionsByDevice())
+                .totalActiveSessions(getTotalActiveSessions())
+                .totalRegisteredUsers(getTotalRegisteredUsers())
+                .sessionsLast24Hours(getSessionsLast24Hours())
+                .registrationsLast24Hours(getRegistrationsLast24Hours())
+                .sessionsByDevice(getSessionsByDevice())
                 .build();
     }
 
@@ -200,9 +200,9 @@ public class AuthHealthService implements HealthIndicator {
                 .path(path)
                 .method(method)
                 .status("UP")
-                .request_count(endpointMetrics.getOrDefault(key, new AtomicLong(0)).get())
-                .average_response_time(endpointResponseTimes.getOrDefault(key, 0.0))
-                .last_access_time(endpointLastAccess.getOrDefault(key, 0L))
+                .requestCount(endpointMetrics.getOrDefault(key, new AtomicLong(0)).get())
+                .averageResponseTime(endpointResponseTimes.getOrDefault(key, 0.0))
+                .lastAccessTime(endpointLastAccess.getOrDefault(key, 0L))
                 .build();
     }
 
@@ -315,7 +315,7 @@ public class AuthHealthService implements HealthIndicator {
     private Map<String, Object> convertToMap(AuthHealthResponse response) {
         Map<String, Object> map = new HashMap<>();
         map.put("status", response.getStatus());
-        map.put("serviceName", response.getService_name());
+        map.put("serviceName", response.getServiceName());
         map.put("version", response.getVersion());
         map.put("timestamp", response.getTimestamp());
         map.put("uptime", response.getUptime());
@@ -323,7 +323,7 @@ public class AuthHealthService implements HealthIndicator {
         map.put("security", response.getSecurity());
         map.put("endpoints", response.getEndpoints());
         map.put("system", response.getSystem());
-        map.put("activeSessions", response.getActive_sessions());
+        map.put("activeSessions", response.getActiveSessions());
         return map;
     }
 }

@@ -34,8 +34,20 @@ public class Brand extends BaseEntity {
     @Column(name = "description", length = 500)
     private String description;
 
-    @Column(name = "logo_url", length = 500)
-    private String logoUrl;
+    @Column(name = "logo_object_key", length = 500)
+    private String logoObjectKey;
+
+    @Column(name = "logo_file_size")
+    private Long logoFileSize;
+
+    @Column(name = "logo_content_type", length = 50)
+    private String logoContentType;
+
+    @Column(name = "logo_width")
+    private Integer logoWidth;
+
+    @Column(name = "logo_height")
+    private Integer logoHeight;
 
     @Column(name = "website_url", length = 300)
     private String websiteUrl;

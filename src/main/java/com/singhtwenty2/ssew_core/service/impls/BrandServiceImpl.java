@@ -4,6 +4,7 @@ import com.singhtwenty2.ssew_core.data.entity.Brand;
 import com.singhtwenty2.ssew_core.data.entity.Category;
 import com.singhtwenty2.ssew_core.data.repository.BrandRepository;
 import com.singhtwenty2.ssew_core.data.repository.CategoryRepository;
+import com.singhtwenty2.ssew_core.service.BrandImageService;
 import com.singhtwenty2.ssew_core.service.BrandService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -22,6 +23,7 @@ import java.util.UUID;
 import java.util.stream.Collectors;
 
 import static com.singhtwenty2.ssew_core.data.dto.catalog_management.BrandDTO.*;
+import static com.singhtwenty2.ssew_core.data.dto.catalog_management.BrandImage.BrandImageResult;
 
 @Service
 @Slf4j
@@ -31,6 +33,7 @@ public class BrandServiceImpl implements BrandService {
 
     private final BrandRepository brandRepository;
     private final CategoryRepository categoryRepository;
+    private final BrandImageService brandImageService;
 
     @Override
     public BrandResponse createBrand(CreateBrandRequest createBrandRequest) {
@@ -38,17 +41,33 @@ public class BrandServiceImpl implements BrandService {
 
         validateCreateBrandRequest(createBrandRequest);
 
-        Category category = findCategoryById(createBrandRequest.getCategory_id());
+        Category category = findCategoryById(createBrandRequest.getCategoryId());
 
         String slug = generateSlug(createBrandRequest.getName());
         validateUniqueSlug(slug);
         validateUniqueName(createBrandRequest.getName());
 
-        Integer displayOrder = createBrandRequest.getDisplay_order() != null
-                ? createBrandRequest.getDisplay_order()
+        Integer displayOrder = createBrandRequest.getDisplayOrder() != null
+                ? createBrandRequest.getDisplayOrder()
                 : getNextDisplayOrder(category);
 
         Brand brand = createBrandFromRequest(createBrandRequest, category, slug, displayOrder);
+
+        BrandImageResult logoResult = null;
+        if (createBrandRequest.getLogoFile() != null && !createBrandRequest.getLogoFile().isEmpty()) {
+            logoResult = brandImageService.processBrandLogo(createBrandRequest.getLogoFile(), brand.getSlug());
+
+            if (logoResult.isTaskExecuted()) {
+                brand.setLogoObjectKey(logoResult.getObjectKey());
+                brand.setLogoFileSize(logoResult.getFileSize());
+                brand.setLogoContentType(logoResult.getContentType());
+                brand.setLogoWidth(logoResult.getWidth());
+                brand.setLogoHeight(logoResult.getHeight());
+            } else {
+                log.warn("Failed to process brand logo: {}", logoResult.getErrorMessage());
+            }
+        }
+
         Brand savedBrand = brandRepository.save(brand);
 
         log.info("Brand created successfully with ID: {}", savedBrand.getId());
@@ -153,6 +172,8 @@ public class BrandServiceImpl implements BrandService {
 
         updateBrandFields(existingBrand, updateBrandRequest);
 
+        handleLogoUpdate(existingBrand, updateBrandRequest);
+
         Brand updatedBrand = brandRepository.save(existingBrand);
 
         log.info("Brand updated successfully with ID: {}", updatedBrand.getId());
@@ -170,6 +191,10 @@ public class BrandServiceImpl implements BrandService {
         if (productCount > 0) {
             throw new ResponseStatusException(HttpStatus.CONFLICT,
                     "Cannot delete brand. It has " + productCount + " associated products");
+        }
+
+        if (StringUtils.hasText(brand.getLogoObjectKey())) {
+            brandImageService.deleteBrandLogo(brand.getSlug(), brand.getLogoObjectKey());
         }
 
         brandRepository.delete(brand);
@@ -202,13 +227,62 @@ public class BrandServiceImpl implements BrandService {
                 .collect(Collectors.toList());
     }
 
+    private void handleLogoUpdate(Brand brand, UpdateBrandRequest request) {
+        boolean logoUpdated = false;
+
+        if (request.getRemoveLogo() != null && request.getRemoveLogo()) {
+            if (StringUtils.hasText(brand.getLogoObjectKey())) {
+                brandImageService.deleteBrandLogo(brand.getSlug(), brand.getLogoObjectKey());
+                clearBrandLogoFields(brand);
+                logoUpdated = true;
+            }
+        }
+
+        if (request.getLogoFile() != null && !request.getLogoFile().isEmpty()) {
+            BrandImageResult logoResult = brandImageService.updateBrandLogo(
+                    request.getLogoFile(),
+                    brand.getSlug(),
+                    brand.getLogoObjectKey()
+            );
+
+            if (logoResult.isTaskExecuted()) {
+                brand.setLogoObjectKey(logoResult.getObjectKey());
+                brand.setLogoFileSize(logoResult.getFileSize());
+                brand.setLogoContentType(logoResult.getContentType());
+                brand.setLogoWidth(logoResult.getWidth());
+                brand.setLogoHeight(logoResult.getHeight());
+                logoUpdated = true;
+            } else {
+                log.warn("Failed to update brand logo: {}", logoResult.getErrorMessage());
+            }
+        }
+
+        if (logoUpdated) {
+            brand.setUpdatedAt(LocalDateTime.now());
+        }
+    }
+
+    private void clearBrandLogoFields(Brand brand) {
+        brand.setLogoObjectKey(null);
+        brand.setLogoFileSize(null);
+        brand.setLogoContentType(null);
+        brand.setLogoWidth(null);
+        brand.setLogoHeight(null);
+    }
+
     private void validateCreateBrandRequest(CreateBrandRequest request) {
         if (!StringUtils.hasText(request.getName()) || request.getName().trim().length() < 2) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Brand name must be at least 2 characters long");
         }
 
-        if (!StringUtils.hasText(request.getCategory_id())) {
+        if (!StringUtils.hasText(request.getCategoryId())) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Category ID is required");
+        }
+
+        if (request.getLogoFile() != null && !request.getLogoFile().isEmpty()) {
+            if (!brandImageService.validateBrandLogoFile(request.getLogoFile())) {
+                throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Invalid logo file");
+            }
         }
     }
 
@@ -260,8 +334,7 @@ public class BrandServiceImpl implements BrandService {
         brand.setName(request.getName().trim());
         brand.setSlug(slug);
         brand.setDescription(StringUtils.hasText(request.getDescription()) ? request.getDescription().trim() : null);
-        brand.setLogoUrl(StringUtils.hasText(request.getLogo_url()) ? request.getLogo_url().trim() : null);
-        brand.setWebsiteUrl(StringUtils.hasText(request.getWebsite_url()) ? request.getWebsite_url().trim() : null);
+        brand.setWebsiteUrl(StringUtils.hasText(request.getWebsiteUrl()) ? request.getWebsiteUrl().trim() : null);
         brand.setDisplayOrder(displayOrder);
         brand.setIsActive(true);
         brand.setCategory(category);
@@ -274,20 +347,36 @@ public class BrandServiceImpl implements BrandService {
     private BrandResponse buildBrandResponse(Brand brand) {
         Long productCount = brandRepository.countProductsByBrandId(brand.getId());
 
+        LogoInfo logoInfo = null;
+        String logoAccessUrl;
+
+        if (StringUtils.hasText(brand.getLogoObjectKey())) {
+            logoAccessUrl = brandImageService.generateLogoAccessUrl(brand.getLogoObjectKey(), 60);
+
+            logoInfo = LogoInfo.builder()
+                    .objectKey(brand.getLogoObjectKey())
+                    .accessUrl(logoAccessUrl)
+                    .fileSize(brand.getLogoFileSize() != null ? brand.getLogoFileSize() : 0)
+                    .contentType(brand.getLogoContentType())
+                    .width(brand.getLogoWidth() != null ? brand.getLogoWidth() : 0)
+                    .height(brand.getLogoHeight() != null ? brand.getLogoHeight() : 0)
+                    .build();
+        }
+
         return BrandResponse.builder()
-                .brand_id(brand.getId().toString())
+                .brandId(brand.getId().toString())
                 .name(brand.getName())
                 .slug(brand.getSlug())
                 .description(brand.getDescription())
-                .logo_url(brand.getLogoUrl())
-                .website_url(brand.getWebsiteUrl())
-                .display_order(brand.getDisplayOrder())
-                .is_active(brand.getIsActive())
-                .created_at(brand.getCreatedAt().toString())
-                .updated_at(brand.getUpdatedAt().toString())
-                .category_id(brand.getCategory().getId().toString())
-                .category_name(brand.getCategory().getName())
-                .product_count(productCount)
+                .websiteUrl(brand.getWebsiteUrl())
+                .displayOrder(brand.getDisplayOrder())
+                .isActive(brand.getIsActive())
+                .createdAt(brand.getCreatedAt().toString())
+                .updatedAt(brand.getUpdatedAt().toString())
+                .categoryId(brand.getCategory().getId().toString())
+                .categoryName(brand.getCategory().getName())
+                .productCount(productCount)
+                .logoInfo(logoInfo)
                 .build();
     }
 
@@ -326,29 +415,24 @@ public class BrandServiceImpl implements BrandService {
             updated = true;
         }
 
-        if (request.getLogo_url() != null) {
-            brand.setLogoUrl(StringUtils.hasText(request.getLogo_url()) ? request.getLogo_url().trim() : null);
+        if (request.getWebsiteUrl() != null) {
+            brand.setWebsiteUrl(StringUtils.hasText(request.getWebsiteUrl()) ? request.getWebsiteUrl().trim() : null);
             updated = true;
         }
 
-        if (request.getWebsite_url() != null) {
-            brand.setWebsiteUrl(StringUtils.hasText(request.getWebsite_url()) ? request.getWebsite_url().trim() : null);
+        if (request.getDisplayOrder() != null && !request.getDisplayOrder().equals(brand.getDisplayOrder())) {
+            brand.setDisplayOrder(request.getDisplayOrder());
             updated = true;
         }
 
-        if (request.getDisplay_order() != null && !request.getDisplay_order().equals(brand.getDisplayOrder())) {
-            brand.setDisplayOrder(request.getDisplay_order());
+        if (request.getIsActive() != null && !request.getIsActive().equals(brand.getIsActive())) {
+            brand.setIsActive(request.getIsActive());
             updated = true;
         }
 
-        if (request.getIs_active() != null && !request.getIs_active().equals(brand.getIsActive())) {
-            brand.setIsActive(request.getIs_active());
-            updated = true;
-        }
-
-        if (StringUtils.hasText(request.getCategory_id()) &&
-            !request.getCategory_id().equals(brand.getCategory().getId().toString())) {
-            Category newCategory = findCategoryById(request.getCategory_id());
+        if (StringUtils.hasText(request.getCategoryId()) &&
+            !request.getCategoryId().equals(brand.getCategory().getId().toString())) {
+            Category newCategory = findCategoryById(request.getCategoryId());
             brand.setCategory(newCategory);
             updated = true;
         }

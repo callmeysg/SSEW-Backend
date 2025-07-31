@@ -12,7 +12,7 @@ public class LoginDTO {
     @AllArgsConstructor
     @NoArgsConstructor
     public static class LoginRequest {
-        private String mobile_number;
+        private String mobileNumber;
         private String password;
     }
 
@@ -23,10 +23,10 @@ public class LoginDTO {
     @AllArgsConstructor
     @NoArgsConstructor
     public static class LoginResponse {
-        private String additional_notes;
-        private String token_type;
-        private String access_token;
-        private String refresh_token;
-        private UserMetadataDTO user_metadata;
+        private String additionalNotes;
+        private String tokenType;
+        private String accessToken;
+        private String refreshToken;
+        private UserMetadataDTO userMetadata;
     }
 }

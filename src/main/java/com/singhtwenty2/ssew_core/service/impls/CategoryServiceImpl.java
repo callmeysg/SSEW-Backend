@@ -137,22 +137,22 @@ public class CategoryServiceImpl implements CategoryService {
                     updateRequest.getDescription().trim() : null);
         }
 
-        if (updateRequest.getDisplay_order() != null) {
-            category.setDisplayOrder(updateRequest.getDisplay_order());
+        if (updateRequest.getDisplayOrder() != null) {
+            category.setDisplayOrder(updateRequest.getDisplayOrder());
         }
 
-        if (updateRequest.getIs_active() != null) {
-            category.setIsActive(updateRequest.getIs_active());
+        if (updateRequest.getIsActive() != null) {
+            category.setIsActive(updateRequest.getIsActive());
         }
 
-        if (updateRequest.getMeta_title() != null) {
-            category.setMetaTitle(StringUtils.hasText(updateRequest.getMeta_title()) ?
-                    updateRequest.getMeta_title().trim() : null);
+        if (updateRequest.getMetaTitle() != null) {
+            category.setMetaTitle(StringUtils.hasText(updateRequest.getMetaTitle()) ?
+                    updateRequest.getMetaTitle().trim() : null);
         }
 
-        if (updateRequest.getMeta_description() != null) {
-            category.setMetaDescription(StringUtils.hasText(updateRequest.getMeta_description()) ?
-                    updateRequest.getMeta_description().trim() : null);
+        if (updateRequest.getMetaDescription() != null) {
+            category.setMetaDescription(StringUtils.hasText(updateRequest.getMetaDescription()) ?
+                    updateRequest.getMetaDescription().trim() : null);
         }
 
         category.setUpdatedAt(LocalDateTime.now());
@@ -253,17 +253,17 @@ public class CategoryServiceImpl implements CategoryService {
         Long brandCount = categoryRepository.countBrandsByCategoryId(category.getId());
 
         return CategoryResponse.builder()
-                .category_id(category.getId().toString())
+                .categoryId(category.getId().toString())
                 .name(category.getName())
                 .slug(category.getSlug())
                 .description(category.getDescription())
                 .display_order(category.getDisplayOrder())
-                .is_active(category.getIsActive())
-                .meta_title(category.getMetaTitle())
-                .meta_description(category.getMetaDescription())
-                .created_at(category.getCreatedAt().toString())
-                .updated_at(category.getUpdatedAt().toString())
-                .brand_count(brandCount)
+                .isActive(category.getIsActive())
+                .metaTitle(category.getMetaTitle())
+                .metaDescription(category.getMetaDescription())
+                .createdAt(category.getCreatedAt().toString())
+                .updatedAt(category.getUpdatedAt().toString())
+                .brandCount(brandCount)
                 .build();
     }
 
@@ -278,13 +278,13 @@ public class CategoryServiceImpl implements CategoryService {
         category.setSlug(slug);
         category.setDescription(StringUtils.hasText(createRequest.getDescription()) ?
                 createRequest.getDescription().trim() : null);
-        category.setDisplayOrder(createRequest.getDisplay_order() != null ?
-                createRequest.getDisplay_order() : getNextDisplayOrder());
+        category.setDisplayOrder(createRequest.getDisplayOrder() != null ?
+                createRequest.getDisplayOrder() : getNextDisplayOrder());
         category.setIsActive(true);
-        category.setMetaTitle(StringUtils.hasText(createRequest.getMeta_title()) ?
-                createRequest.getMeta_title().trim() : null);
-        category.setMetaDescription(StringUtils.hasText(createRequest.getMeta_description()) ?
-                createRequest.getMeta_description().trim() : null);
+        category.setMetaTitle(StringUtils.hasText(createRequest.getMetaTitle()) ?
+                createRequest.getMetaTitle().trim() : null);
+        category.setMetaDescription(StringUtils.hasText(createRequest.getMetaDescription()) ?
+                createRequest.getMetaDescription().trim() : null);
         category.setCreatedAt(LocalDateTime.now());
         category.setUpdatedAt(LocalDateTime.now());
 

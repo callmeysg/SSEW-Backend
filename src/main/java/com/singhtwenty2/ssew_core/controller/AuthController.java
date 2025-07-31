@@ -47,11 +47,11 @@ public class AuthController {
 
         try {
             log.info("User Registration attempt from IP: {} for phone: {}",
-                    getClientIP(request), registerRequest.getMobile_number());
+                    getClientIP(request), registerRequest.getMobileNumber());
 
             RegisterResponse response = authService.registerUser(registerRequest);
 
-            log.info("User registration successful for phone: {}", registerRequest.getMobile_number());
+            log.info("User registration successful for phone: {}", registerRequest.getMobileNumber());
             success = true;
 
             return ResponseEntity.status(HttpStatus.CREATED).body(
@@ -106,7 +106,7 @@ public class AuthController {
 
             if (!developerSecret.equals(decodedSecret)) {
                 log.warn("Admin registration attempt with wrong secret from IP: {} for phone: {}",
-                        getClientIP(request), registerRequest.getMobile_number());
+                        getClientIP(request), registerRequest.getMobileNumber());
                 return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
                         .body(
                                 GlobalApiResponse.<RegisterResponse>builder()
@@ -118,11 +118,11 @@ public class AuthController {
             }
 
             log.info("Admin registration attempt from IP: {} for phone: {}",
-                    getClientIP(request), registerRequest.getMobile_number());
+                    getClientIP(request), registerRequest.getMobileNumber());
 
             RegisterResponse response = authService.registerAdmin(registerRequest);
 
-            log.info("Admin registration successful for phone: {}", registerRequest.getMobile_number());
+            log.info("Admin registration successful for phone: {}", registerRequest.getMobileNumber());
             success = true;
 
             return ResponseEntity.status(HttpStatus.CREATED).body(
@@ -147,11 +147,11 @@ public class AuthController {
 
         try {
             log.info("Login attempt from IP: {} for phone: {}",
-                    getClientIP(request), loginRequest.getMobile_number());
+                    getClientIP(request), loginRequest.getMobileNumber());
 
             LoginResponse response = authService.login(loginRequest);
 
-            log.info("User login successful for phone: {}", loginRequest.getMobile_number());
+            log.info("User login successful for phone: {}", loginRequest.getMobileNumber());
             success = true;
 
             return ResponseEntity.ok(

@@ -4,6 +4,7 @@ import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Size;
 import lombok.*;
+import org.springframework.web.multipart.MultipartFile;
 
 public class BrandDTO {
 
@@ -22,16 +23,15 @@ public class BrandDTO {
         @Size(max = 500, message = "Description must not exceed 500 characters")
         private String description;
 
-        @Size(max = 500, message = "Logo URL must not exceed 500 characters")
-        private String logo_url;
-
         @Size(max = 300, message = "Website URL must not exceed 300 characters")
-        private String website_url;
+        private String websiteUrl;
 
-        private Integer display_order = 0;
+        private Integer displayOrder = 0;
 
         @NotNull(message = "Category ID is required")
-        private String category_id;
+        private String categoryId;
+
+        private MultipartFile logoFile;
     }
 
     @Setter
@@ -48,17 +48,33 @@ public class BrandDTO {
         @Size(max = 500, message = "Description must not exceed 500 characters")
         private String description;
 
-        @Size(max = 500, message = "Logo URL must not exceed 500 characters")
-        private String logo_url;
-
         @Size(max = 300, message = "Website URL must not exceed 300 characters")
-        private String website_url;
+        private String websiteUrl;
 
-        private Integer display_order;
+        private Integer displayOrder;
 
-        private Boolean is_active;
+        private Boolean isActive;
 
-        private String category_id;
+        private String categoryId;
+
+        private MultipartFile logoFile;
+
+        private Boolean removeLogo = false;
+    }
+
+    @Setter
+    @Getter
+    @Data
+    @Builder
+    @AllArgsConstructor
+    @NoArgsConstructor
+    public static class LogoInfo {
+        private String objectKey;
+        private String accessUrl;
+        private long fileSize;
+        private String contentType;
+        private int width;
+        private int height;
     }
 
     @Setter
@@ -68,18 +84,18 @@ public class BrandDTO {
     @AllArgsConstructor
     @NoArgsConstructor
     public static class BrandResponse {
-        private String brand_id;
+        private String brandId;
         private String name;
         private String slug;
         private String description;
-        private String logo_url;
-        private String website_url;
-        private Integer display_order;
-        private Boolean is_active;
-        private String created_at;
-        private String updated_at;
-        private String category_id;
-        private String category_name;
-        private Long product_count;
+        private LogoInfo logoInfo;
+        private String websiteUrl;
+        private Integer displayOrder;
+        private Boolean isActive;
+        private String createdAt;
+        private String updatedAt;
+        private String categoryId;
+        private String categoryName;
+        private Long productCount;
     }
 }

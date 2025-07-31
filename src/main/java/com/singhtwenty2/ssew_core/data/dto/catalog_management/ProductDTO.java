@@ -29,7 +29,7 @@ public class ProductDTO {
         private String description;
 
         @Size(max = 500, message = "Short description must not exceed 500 characters")
-        private String short_description;
+        private String shortDescription;
 
         @NotNull(message = "Price is required")
         @DecimalMin(value = "0.0", inclusive = false, message = "Price must be greater than 0")
@@ -38,11 +38,11 @@ public class ProductDTO {
 
         @DecimalMin(value = "0.0", message = "Compare price must be greater than or equal to 0")
         @Digits(integer = 8, fraction = 2, message = "Compare price format is invalid")
-        private BigDecimal compare_price;
+        private BigDecimal comparePrice;
 
         @DecimalMin(value = "0.0", message = "Cost price must be greater than or equal to 0")
         @Digits(integer = 8, fraction = 2, message = "Cost price format is invalid")
-        private BigDecimal cost_price;
+        private BigDecimal costPrice;
 
         @DecimalMin(value = "0.0", message = "Weight must be greater than or equal to 0")
         private BigDecimal weight;
@@ -51,28 +51,28 @@ public class ProductDTO {
         private String dimensions;
 
         @Min(value = 0, message = "Stock quantity must be greater than or equal to 0")
-        private Integer stock_quantity = 0;
+        private Integer stockQuantity = 0;
 
         @Min(value = 0, message = "Min stock level must be greater than or equal to 0")
-        private Integer min_stock_level = 0;
+        private Integer minStockLevel = 0;
 
-        private Boolean track_inventory = true;
+        private Boolean trackInventory = true;
 
         private ProductStatus status = ProductStatus.DRAFT;
 
-        private Boolean is_featured = false;
+        private Boolean isFeatured = false;
 
         @Size(max = 150, message = "Meta title must not exceed 150 characters")
-        private String meta_title;
+        private String metaTitle;
 
         @Size(max = 300, message = "Meta description must not exceed 300 characters")
-        private String meta_description;
+        private String metaDescription;
 
         @Size(max = 500, message = "Tags must not exceed 500 characters")
         private String tags;
 
         @NotNull(message = "Brand ID is required")
-        private String brand_id;
+        private String brandId;
     }
 
     @Setter
@@ -89,7 +89,7 @@ public class ProductDTO {
         private String description;
 
         @Size(max = 500, message = "Short description must not exceed 500 characters")
-        private String short_description;
+        private String shortDescription;
 
         @DecimalMin(value = "0.0", inclusive = false, message = "Price must be greater than 0")
         @Digits(integer = 8, fraction = 2, message = "Price format is invalid")
@@ -97,11 +97,11 @@ public class ProductDTO {
 
         @DecimalMin(value = "0.0", message = "Compare price must be greater than or equal to 0")
         @Digits(integer = 8, fraction = 2, message = "Compare price format is invalid")
-        private BigDecimal compare_price;
+        private BigDecimal comparePrice;
 
         @DecimalMin(value = "0.0", message = "Cost price must be greater than or equal to 0")
         @Digits(integer = 8, fraction = 2, message = "Cost price format is invalid")
-        private BigDecimal cost_price;
+        private BigDecimal costPrice;
 
         @DecimalMin(value = "0.0", message = "Weight must be greater than or equal to 0")
         private BigDecimal weight;
@@ -110,27 +110,27 @@ public class ProductDTO {
         private String dimensions;
 
         @Min(value = 0, message = "Stock quantity must be greater than or equal to 0")
-        private Integer stock_quantity;
+        private Integer stockQuantity;
 
         @Min(value = 0, message = "Min stock level must be greater than or equal to 0")
-        private Integer min_stock_level;
+        private Integer minStockLevel;
 
-        private Boolean track_inventory;
+        private Boolean trackInventory;
 
         private ProductStatus status;
 
-        private Boolean is_featured;
+        private Boolean isFeatured;
 
         @Size(max = 150, message = "Meta title must not exceed 150 characters")
-        private String meta_title;
+        private String metaTitle;
 
         @Size(max = 300, message = "Meta description must not exceed 300 characters")
-        private String meta_description;
+        private String metaDescription;
 
         @Size(max = 500, message = "Tags must not exceed 500 characters")
         private String tags;
 
-        private String brand_id;
+        private String brandId;
     }
 
     @Setter
@@ -140,34 +140,34 @@ public class ProductDTO {
     @AllArgsConstructor
     @NoArgsConstructor
     public static class ProductResponse {
-        private String product_id;
+        private String productId;
         private String name;
         private String slug;
         private String sku;
         private String description;
-        private String short_description;
+        private String shortDescription;
         private BigDecimal price;
-        private BigDecimal compare_price;
-        private BigDecimal cost_price;
+        private BigDecimal comparePrice;
+        private BigDecimal costPrice;
         private BigDecimal weight;
         private String dimensions;
-        private Integer stock_quantity;
-        private Integer min_stock_level;
-        private Boolean track_inventory;
+        private Integer stockQuantity;
+        private Integer minStockLevel;
+        private Boolean trackInventory;
         private ProductStatus status;
-        private Boolean is_featured;
-        private String meta_title;
-        private String meta_description;
+        private Boolean isFeatured;
+        private String metaTitle;
+        private String metaDescription;
         private String tags;
-        private String created_at;
-        private String updated_at;
-        private String brand_id;
-        private String brand_name;
-        private String category_id;
-        private String category_name;
+        private String createdAt;
+        private String updatedAt;
+        private String brandId;
+        private String brandName;
+        private String categoryId;
+        private String categoryName;
         private List<ProductImageResponse> images;
-        private ProductImageResponse thumbnail_image;
-        private Boolean is_in_stock;
-        private Boolean is_low_stock;
+        private ProductImageResponse thumbnailImage;
+        private Boolean isInStock;
+        private Boolean isLowStock;
     }
 }

@@ -9,16 +9,16 @@ import lombok.*;
 @AllArgsConstructor
 @NoArgsConstructor
 public class UserMetadataDTO {
-    private String user_id;
+    private String userId;
     private String name;
     private String phone;
     private String email;
     private String role;
-    private Boolean is_email_verified;
-    private Boolean is_phone_verified;
-    private Integer failed_login_attempts;
-    private String last_login_time;
-    private String created_at;
-    private String updated_at;
+    private Boolean isEmailVerified;
+    private Boolean isPhoneVerified;
+    private Integer failedLoginAttempts;
+    private String lastLoginTime;
+    private String createdAt;
+    private String updatedAt;
     private Long version;
 }
