@@ -6,10 +6,14 @@ import lombok.AllArgsConstructor;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
+import org.hibernate.annotations.JdbcTypeCode;
+import org.hibernate.type.SqlTypes;
 
 import java.math.BigDecimal;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 
 @Entity
 @Table(
@@ -85,6 +89,10 @@ public class Product extends BaseEntity {
     @Column(name = "tags", length = 500)
     private String tags;
 
+    @JdbcTypeCode(SqlTypes.JSON)
+    @Column(name = "specifications", columnDefinition = "JSON")
+    private Map<String, String> specifications = new HashMap<>();
+
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "brand_id", nullable = false)
     private Brand brand;
@@ -121,5 +129,22 @@ public class Product extends BaseEntity {
 
     public boolean isLowStock() {
         return stockQuantity <= minStockLevel;
+    }
+
+    public void addSpecification(String key, String value) {
+        if (specifications == null) {
+            specifications = new HashMap<>();
+        }
+        specifications.put(key, value);
+    }
+
+    public void removeSpecification(String key) {
+        if (specifications != null) {
+            specifications.remove(key);
+        }
+    }
+
+    public String getSpecification(String key) {
+        return specifications != null ? specifications.get(key) : null;
     }
 }

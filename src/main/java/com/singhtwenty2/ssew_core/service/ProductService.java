@@ -12,6 +12,8 @@ import org.springframework.stereotype.Service;
 import java.math.BigDecimal;
 import java.util.List;
 
+import static com.singhtwenty2.ssew_core.data.dto.catalog_management.ProductDTO.ProductSpecificationUpdateRequest;
+
 @Service
 public interface ProductService {
 
@@ -57,6 +59,8 @@ public interface ProductService {
     ProductResponse updateProductStatus(String productId, ProductStatus status);
 
     ProductResponse toggleFeaturedStatus(String productId);
+
+    ProductResponse updateProductSpecifications(String productId, ProductSpecificationUpdateRequest specificationRequest);
 
     void deleteProduct(String productId);
 }

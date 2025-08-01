@@ -1,9 +1,6 @@
 package com.singhtwenty2.ssew_core.controller;
 
-import com.singhtwenty2.ssew_core.data.dto.catalog_management.ProductDTO.CreateProductRequest;
-import com.singhtwenty2.ssew_core.data.dto.catalog_management.ProductDTO.ProductInventoryUpdateRequest;
-import com.singhtwenty2.ssew_core.data.dto.catalog_management.ProductDTO.ProductResponse;
-import com.singhtwenty2.ssew_core.data.dto.catalog_management.ProductDTO.UpdateProductRequest;
+import com.singhtwenty2.ssew_core.data.dto.catalog_management.ProductDTO.*;
 import com.singhtwenty2.ssew_core.data.dto.common.GlobalApiResponse;
 import com.singhtwenty2.ssew_core.data.dto.common.PageResponse;
 import com.singhtwenty2.ssew_core.data.enums.ProductStatus;
@@ -46,7 +43,7 @@ public class ProductController {
 
         ProductResponse response = productService.createProduct(createRequest);
 
-        log.info("Product created successfully with ID: {}", response.getProductId());
+        log.info("Product created successfully with ID: {} and SKU: {}", response.getProductId(), response.getSku());
 
         return ResponseEntity.status(HttpStatus.CREATED).body(
                 GlobalApiResponse.<ProductResponse>builder()
@@ -425,6 +422,28 @@ public class ProductController {
                 GlobalApiResponse.<ProductResponse>builder()
                         .success(true)
                         .message("Product featured status toggled successfully")
+                        .data(response)
+                        .build()
+        );
+    }
+
+    @PatchMapping("/{productId}/specifications")
+    @PreAuthorize("hasRole('ADMIN')")
+    public ResponseEntity<GlobalApiResponse<ProductResponse>> updateProductSpecifications(
+            @PathVariable String productId,
+            @Valid @RequestBody ProductSpecificationUpdateRequest specificationRequest,
+            HttpServletRequest request
+    ) {
+        log.info("Product specifications update attempt from IP: {} for ID: {}", getClientIP(request), productId);
+
+        ProductResponse response = productService.updateProductSpecifications(productId, specificationRequest);
+
+        log.info("Product specifications updated successfully with ID: {}", productId);
+
+        return ResponseEntity.ok(
+                GlobalApiResponse.<ProductResponse>builder()
+                        .success(true)
+                        .message("Product specifications updated successfully")
                         .data(response)
                         .build()
         );

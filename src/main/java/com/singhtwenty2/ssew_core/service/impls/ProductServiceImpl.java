@@ -6,6 +6,8 @@ import com.singhtwenty2.ssew_core.data.enums.ProductStatus;
 import com.singhtwenty2.ssew_core.data.repository.BrandRepository;
 import com.singhtwenty2.ssew_core.data.repository.ProductRepository;
 import com.singhtwenty2.ssew_core.service.ProductService;
+import com.singhtwenty2.ssew_core.service.SkuGenerationService;
+import com.singhtwenty2.ssew_core.util.sanitizer.SpecificationSanitizer;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.Page;
@@ -18,9 +20,7 @@ import org.springframework.web.server.ResponseStatusException;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
-import java.util.List;
-import java.util.Optional;
-import java.util.UUID;
+import java.util.*;
 import java.util.stream.Collectors;
 
 import static com.singhtwenty2.ssew_core.data.dto.catalog_management.ProductDTO.*;
@@ -33,6 +33,8 @@ public class ProductServiceImpl implements ProductService {
 
     private final ProductRepository productRepository;
     private final BrandRepository brandRepository;
+    private final SkuGenerationService skuGenerationService;
+    private final SpecificationSanitizer specificationSanitizer;
 
     @Override
     public ProductResponse createProduct(CreateProductRequest createProductRequest) {
@@ -44,12 +46,13 @@ public class ProductServiceImpl implements ProductService {
 
         String slug = generateSlug(createProductRequest.getName());
         validateUniqueSlug(slug);
-        validateUniqueSku(createProductRequest.getSku());
 
-        Product product = createProductFromRequest(createProductRequest, brand, slug);
+        String sku = skuGenerationService.generateUniqueSku(brand);
+
+        Product product = createProductFromRequest(createProductRequest, brand, slug, sku);
         Product savedProduct = productRepository.save(product);
 
-        log.info("Product created successfully with ID: {}", savedProduct.getId());
+        log.info("Product created successfully with ID: {} and SKU: {}", savedProduct.getId(), savedProduct.getSku());
 
         return buildProductResponse(savedProduct);
     }
@@ -264,6 +267,23 @@ public class ProductServiceImpl implements ProductService {
     }
 
     @Override
+    public ProductResponse updateProductSpecifications(String productId, ProductSpecificationUpdateRequest specificationRequest) {
+        log.debug("Updating product specifications for ID: {}", productId);
+
+        Product product = findProductById(productId);
+
+        Map<String, String> sanitizedSpecs = specificationSanitizer.sanitizeSpecifications(specificationRequest.getSpecifications());
+        product.setSpecifications(sanitizedSpecs);
+        product.setUpdatedAt(LocalDateTime.now());
+
+        Product updatedProduct = productRepository.save(product);
+
+        log.info("Product specifications updated successfully for ID: {}", productId);
+
+        return buildProductResponse(updatedProduct);
+    }
+
+    @Override
     public void deleteProduct(String productId) {
         log.debug("Deleting product with ID: {}", productId);
 
@@ -277,10 +297,6 @@ public class ProductServiceImpl implements ProductService {
     private void validateCreateProductRequest(CreateProductRequest request) {
         if (!StringUtils.hasText(request.getName()) || request.getName().trim().length() < 2) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Product name must be at least 2 characters long");
-        }
-
-        if (!StringUtils.hasText(request.getSku()) || request.getSku().trim().length() < 2) {
-            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "SKU must be at least 2 characters long");
         }
 
         if (!StringUtils.hasText(request.getBrandId())) {
@@ -320,17 +336,11 @@ public class ProductServiceImpl implements ProductService {
         }
     }
 
-    private void validateUniqueSku(String sku) {
-        if (productRepository.existsBySku(sku)) {
-            throw new ResponseStatusException(HttpStatus.CONFLICT, "Product with this SKU already exists");
-        }
-    }
-
-    private Product createProductFromRequest(CreateProductRequest request, Brand brand, String slug) {
+    private Product createProductFromRequest(CreateProductRequest request, Brand brand, String slug, String sku) {
         Product product = new Product();
         product.setName(request.getName().trim());
         product.setSlug(slug);
-        product.setSku(request.getSku().trim().toUpperCase());
+        product.setSku(sku);
         product.setDescription(StringUtils.hasText(request.getDescription()) ? request.getDescription().trim() : null);
         product.setShortDescription(StringUtils.hasText(request.getShortDescription()) ? request.getShortDescription().trim() : null);
         product.setPrice(request.getPrice());
@@ -349,6 +359,10 @@ public class ProductServiceImpl implements ProductService {
         product.setBrand(brand);
         product.setCreatedAt(LocalDateTime.now());
         product.setUpdatedAt(LocalDateTime.now());
+
+        if (request.getSpecifications() != null && !request.getSpecifications().isEmpty()) {
+            product.setSpecifications(specificationSanitizer.sanitizeSpecifications(request.getSpecifications()));
+        }
 
         return product;
     }
@@ -385,6 +399,7 @@ public class ProductServiceImpl implements ProductService {
                 .imageCount(imageCount)
                 .isInStock(product.isInStock())
                 .isLowStock(product.isLowStock())
+                .specifications(product.getSpecifications() != null ? new HashMap<>(product.getSpecifications()) : new HashMap<>())
                 .build();
     }
 
@@ -414,12 +429,6 @@ public class ProductServiceImpl implements ProductService {
                 validateUniqueSlugForUpdate(newSlug, product.getId());
                 product.setSlug(newSlug);
             }
-            updated = true;
-        }
-
-        if (StringUtils.hasText(request.getSku()) && !request.getSku().equals(product.getSku())) {
-            validateUniqueSkuForUpdate(request.getSku(), product.getId());
-            product.setSku(request.getSku().trim().toUpperCase());
             updated = true;
         }
 
@@ -511,6 +520,12 @@ public class ProductServiceImpl implements ProductService {
             updated = true;
         }
 
+        if (request.getSpecifications() != null) {
+            Map<String, String> sanitizedSpecs = specificationSanitizer.sanitizeSpecifications(request.getSpecifications());
+            product.setSpecifications(sanitizedSpecs);
+            updated = true;
+        }
+
         if (updated) {
             product.setUpdatedAt(LocalDateTime.now());
         }
@@ -519,12 +534,6 @@ public class ProductServiceImpl implements ProductService {
     private void validateUniqueSlugForUpdate(String slug, UUID productId) {
         if (productRepository.existsBySlugAndIdNot(slug, productId)) {
             throw new ResponseStatusException(HttpStatus.CONFLICT, "Product with this slug already exists");
-        }
-    }
-
-    private void validateUniqueSkuForUpdate(String sku, UUID productId) {
-        if (productRepository.existsBySkuAndIdNot(sku, productId)) {
-            throw new ResponseStatusException(HttpStatus.CONFLICT, "Product with this SKU already exists");
         }
     }
 }

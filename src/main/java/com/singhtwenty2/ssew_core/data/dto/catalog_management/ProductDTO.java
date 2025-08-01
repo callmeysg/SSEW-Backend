@@ -5,6 +5,7 @@ import jakarta.validation.constraints.*;
 import lombok.*;
 
 import java.math.BigDecimal;
+import java.util.Map;
 
 public class ProductDTO {
 
@@ -19,10 +20,6 @@ public class ProductDTO {
         @NotBlank(message = "Product name is required")
         @Size(max = 200, message = "Product name must not exceed 200 characters")
         private String name;
-
-        @NotBlank(message = "SKU is required")
-        @Size(max = 50, message = "SKU must not exceed 50 characters")
-        private String sku;
 
         private String description;
 
@@ -73,6 +70,8 @@ public class ProductDTO {
 
         @NotNull(message = "Brand ID is required")
         private String brandId;
+
+        private Map<String, String> specifications;
     }
 
     @Setter
@@ -85,9 +84,6 @@ public class ProductDTO {
 
         @Size(max = 200, message = "Product name must not exceed 200 characters")
         private String name;
-
-        @Size(max = 50, message = "SKU must not exceed 50 characters")
-        private String sku;
 
         private String description;
 
@@ -135,6 +131,8 @@ public class ProductDTO {
         private String tags;
 
         private String brandId;
+
+        private Map<String, String> specifications;
     }
 
     @Setter
@@ -172,6 +170,7 @@ public class ProductDTO {
         private Long imageCount;
         private Boolean isInStock;
         private Boolean isLowStock;
+        private Map<String, String> specifications;
     }
 
     @Setter
@@ -189,5 +188,16 @@ public class ProductDTO {
         private Integer minStockLevel;
 
         private Boolean trackInventory;
+    }
+
+    @Setter
+    @Getter
+    @Data
+    @Builder
+    @AllArgsConstructor
+    @NoArgsConstructor
+    public static class ProductSpecificationUpdateRequest {
+        @NotNull(message = "Specifications are required")
+        private Map<String, String> specifications;
     }
 }
