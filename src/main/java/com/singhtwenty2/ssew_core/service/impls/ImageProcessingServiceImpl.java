@@ -29,9 +29,10 @@ import static com.singhtwenty2.ssew_core.data.dto.catalog_management.ImageDTO.*;
 @RequiredArgsConstructor
 public class ImageProcessingServiceImpl implements ImageProcessingService {
 
-    private static final String[] SUPPORTED_FORMATS = {"jpg", "jpeg", "png", "webp"};
+    private static final String[] SUPPORTED_FORMATS = {"jpg", "jpeg", "png", "webp", "gif", "bmp"};
     private static final long MAX_FILE_SIZE = 10 * 1024 * 1024;
     private static final int MIN_DIMENSION = 50;
+    private static final int MAX_DIMENSION = 5000;
 
     @Override
     public ProcessedImageResult processImage(MultipartFile file, ImageProcessingConfig config) {
@@ -40,8 +41,11 @@ public class ImageProcessingServiceImpl implements ImageProcessingService {
         try {
             BufferedImage originalImage = ImageIO.read(file.getInputStream());
             if (originalImage == null) {
-                throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Invalid image file");
+                throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Invalid image file - could not read image data");
             }
+
+            log.debug("Processing image - Original: {}x{}, Size: {} bytes",
+                    originalImage.getWidth(), originalImage.getHeight(), file.getSize());
 
             ImageMetadata metadata = ImageMetadata.builder()
                     .width(originalImage.getWidth())
@@ -50,11 +54,14 @@ public class ImageProcessingServiceImpl implements ImageProcessingService {
                     .originalSize(file.getSize())
                     .build();
 
-            BufferedImage processedImage = resizeImage(originalImage, config);
+            BufferedImage processedImage = resizeImageGracefully(originalImage, config);
 
-            byte[] imageData = compressImage(processedImage, config);
+            byte[] imageData = compressImageWithBetterQuality(processedImage, config);
             String contentType = "image/" + config.getOutputFormat();
             String fileExtension = "." + config.getOutputFormat();
+
+            log.debug("Image processed successfully - Final: {}x{}, Size: {} bytes",
+                    processedImage.getWidth(), processedImage.getHeight(), imageData.length);
 
             return ProcessedImageResult.builder()
                     .imageData(imageData)
@@ -66,7 +73,7 @@ public class ImageProcessingServiceImpl implements ImageProcessingService {
 
         } catch (IOException e) {
             log.error("Failed to process image: {}", e.getMessage(), e);
-            throw new ResponseStatusException(HttpStatus.INTERNAL_SERVER_ERROR, "Failed to process image");
+            throw new ResponseStatusException(HttpStatus.INTERNAL_SERVER_ERROR, "Failed to process image: " + e.getMessage());
         }
     }
 
@@ -95,7 +102,19 @@ public class ImageProcessingServiceImpl implements ImageProcessingService {
         }
 
         String extension = getFileExtension(originalFilename).toLowerCase();
-        return Arrays.asList(SUPPORTED_FORMATS).contains(extension);
+        boolean isValidFormat = Arrays.asList(SUPPORTED_FORMATS).contains(extension);
+
+        if (isValidFormat) {
+            try {
+                BufferedImage testImage = ImageIO.read(file.getInputStream());
+                return testImage != null;
+            } catch (IOException e) {
+                log.warn("File has valid extension but is not a valid image: {}", originalFilename);
+                return false;
+            }
+        }
+
+        return false;
     }
 
     @Override
@@ -134,12 +153,17 @@ public class ImageProcessingServiceImpl implements ImageProcessingService {
         }
     }
 
-    private Dimension calculateNewDimensions(
+    private Dimension calculateOptimalDimensions(
             int originalWidth,
             int originalHeight,
             int maxWidth,
             int maxHeight,
             boolean maintainAspectRatio) {
+
+        if (originalWidth > MAX_DIMENSION || originalHeight > MAX_DIMENSION) {
+            log.warn("Image dimensions exceed safety limit: {}x{}", originalWidth, originalHeight);
+        }
+
         if (!maintainAspectRatio) {
             return new Dimension(Math.min(originalWidth, maxWidth), Math.min(originalHeight, maxHeight));
         }
@@ -152,22 +176,28 @@ public class ImageProcessingServiceImpl implements ImageProcessingService {
         double heightRatio = (double) maxHeight / originalHeight;
         double ratio = Math.min(widthRatio, heightRatio);
 
-        int newWidth = (int) (originalWidth * ratio);
-        int newHeight = (int) (originalHeight * ratio);
+        int newWidth = (int) Math.round(originalWidth * ratio);
+        int newHeight = (int) Math.round(originalHeight * ratio);
+
+        newWidth = Math.max(newWidth, MIN_DIMENSION);
+        newHeight = Math.max(newHeight, MIN_DIMENSION);
 
         return new Dimension(newWidth, newHeight);
     }
 
-    private BufferedImage resizeImage(BufferedImage originalImage, ImageProcessingConfig config) {
+    /**
+     * Gracefully resize image instead of throwing errors for oversized images
+     */
+    private BufferedImage resizeImageGracefully(BufferedImage originalImage, ImageProcessingConfig config) {
         int originalWidth = originalImage.getWidth();
         int originalHeight = originalImage.getHeight();
 
         if (originalWidth < MIN_DIMENSION || originalHeight < MIN_DIMENSION) {
-            throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
-                    "Image dimensions must be at least " + MIN_DIMENSION + "x" + MIN_DIMENSION + " pixels");
+            log.warn("Image dimensions are smaller than recommended: {}x{} (minimum: {}x{})",
+                    originalWidth, originalHeight, MIN_DIMENSION, MIN_DIMENSION);
         }
 
-        Dimension newDimension = calculateNewDimensions(
+        Dimension newDimension = calculateOptimalDimensions(
                 originalWidth, originalHeight,
                 config.getMaxWidth(), config.getMaxHeight(),
                 config.isMaintainAspectRatio()
@@ -177,34 +207,40 @@ public class ImageProcessingServiceImpl implements ImageProcessingService {
             return originalImage;
         }
 
+        log.debug("Resizing image from {}x{} to {}x{}",
+                originalWidth, originalHeight, newDimension.width, newDimension.height);
+
         BufferedImage resizedImage = new BufferedImage(
                 newDimension.width, newDimension.height, BufferedImage.TYPE_INT_RGB
         );
 
         Graphics2D g2d = resizedImage.createGraphics();
-        g2d.setRenderingHint(RenderingHints.KEY_INTERPOLATION, RenderingHints.VALUE_INTERPOLATION_BILINEAR);
+
+        g2d.setRenderingHint(RenderingHints.KEY_INTERPOLATION, RenderingHints.VALUE_INTERPOLATION_BICUBIC);
         g2d.setRenderingHint(RenderingHints.KEY_RENDERING, RenderingHints.VALUE_RENDER_QUALITY);
         g2d.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
+        g2d.setRenderingHint(RenderingHints.KEY_ALPHA_INTERPOLATION, RenderingHints.VALUE_ALPHA_INTERPOLATION_QUALITY);
+        g2d.setRenderingHint(RenderingHints.KEY_COLOR_RENDERING, RenderingHints.VALUE_COLOR_RENDER_QUALITY);
 
         g2d.setColor(Color.WHITE);
         g2d.fillRect(0, 0, newDimension.width, newDimension.height);
+
         g2d.drawImage(originalImage, 0, 0, newDimension.width, newDimension.height, null);
         g2d.dispose();
 
         return resizedImage;
     }
 
-    private byte[] compressToWebP(BufferedImage image, float quality) throws IOException {
-        ByteArrayOutputStream byteArrayOutputStream = new ByteArrayOutputStream();
-        ImageIO.write(image, "png", byteArrayOutputStream);
-        return byteArrayOutputStream.toByteArray();
-    }
-
-    private byte[] compressImage(BufferedImage image, ImageProcessingConfig config) throws IOException {
+    /**
+     * Improved compression with better quality settings
+     */
+    private byte[] compressImageWithBetterQuality(BufferedImage image, ImageProcessingConfig config) throws IOException {
         ByteArrayOutputStream byteArrayOutputStream = new ByteArrayOutputStream();
 
         if ("webp".equals(config.getOutputFormat())) {
-            return compressToWebP(image, config.getQuality());
+            // For WebP, we'll use PNG as fallback since Java doesn't natively support WebP writing
+            // In production. You might want to use a library like imageio-webp
+            return compressToWebPFallback(image, config.getQuality());
         }
 
         Iterator<ImageWriter> writers = ImageIO.getImageWritersByFormatName(config.getOutputFormat());
@@ -219,7 +255,11 @@ public class ImageProcessingServiceImpl implements ImageProcessingService {
             ImageWriteParam param = writer.getDefaultWriteParam();
             if (param.canWriteCompressed()) {
                 param.setCompressionMode(ImageWriteParam.MODE_EXPLICIT);
-                param.setCompressionQuality(config.getQuality());
+
+                float actualQuality = adjustQualityByFormat(config.getOutputFormat(), config.getQuality());
+                param.setCompressionQuality(actualQuality);
+
+                log.debug("Using compression quality: {} for format: {}", actualQuality, config.getOutputFormat());
             }
 
             writer.write(null, new IIOImage(image, null, null), param);
@@ -227,13 +267,46 @@ public class ImageProcessingServiceImpl implements ImageProcessingService {
             writer.dispose();
         }
 
-        return byteArrayOutputStream.toByteArray();
+        byte[] result = byteArrayOutputStream.toByteArray();
+        log.debug("Compressed image size: {} bytes (quality: {})", result.length, config.getQuality());
+
+        return result;
+    }
+
+    /**
+     * Adjust quality based on output format for better results
+     */
+    private float adjustQualityByFormat(String format, float requestedQuality) {
+        return switch (format.toLowerCase()) {
+            case "jpg", "jpeg" -> Math.max(0.8f, requestedQuality);
+            case "png" -> 1.0f;
+            case "webp" -> Math.max(0.85f, requestedQuality);
+            default -> Math.max(0.85f, requestedQuality);
+        };
+    }
+
+    /**
+     * Fallback method for WebP (using high-quality PNG instead)
+     * In production, considers using imageio-webp library for true WebP support
+     */
+    private byte[] compressToWebPFallback(BufferedImage image, float quality) throws IOException {
+        ByteArrayOutputStream byteArrayOutputStream = new ByteArrayOutputStream();
+
+        boolean written = ImageIO.write(image, "png", byteArrayOutputStream);
+        if (!written) {
+            throw new IOException("Failed to write image in PNG format");
+        }
+
+        byte[] result = byteArrayOutputStream.toByteArray();
+        log.debug("WebP fallback (PNG) image size: {} bytes", result.length);
+
+        return result;
     }
 
     private String getFileExtension(String filename) {
         if (filename == null || !filename.contains(".")) {
             return "";
         }
-        return filename.substring(filename.lastIndexOf(".") + 1);
+        return filename.substring(filename.lastIndexOf(".") + 1).toLowerCase();
     }
 }

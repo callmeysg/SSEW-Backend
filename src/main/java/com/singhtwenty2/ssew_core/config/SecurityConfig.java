@@ -36,6 +36,7 @@ public class SecurityConfig {
                 .authorizeHttpRequests(auth -> auth
                         .requestMatchers(
                                 "/v1/auth/**",           // All auth endpoints
+                                "/v1/images/requirements/**", // Image requirement endpoints
                                 "/v1/public/**",         // Public API endpoints
                                 "/v1/health",            // Health check
                                 "/actuator/health",      // Spring Boot health actuator
