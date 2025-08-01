@@ -24,7 +24,7 @@ spring:
     banner-mode: off
   web:
     resources:
-      add-mappings: false
+      add-mappings: true
   jackson:
     property-naming-strategy: SNAKE_CASE
   servlet:

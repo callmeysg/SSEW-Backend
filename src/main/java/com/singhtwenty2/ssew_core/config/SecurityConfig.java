@@ -66,6 +66,18 @@ public class SecurityConfig {
                         .requestMatchers(HttpMethod.GET, "/v1/brands/category/*/ordered").permitAll()     // Get brands by category ordered
                         .requestMatchers(HttpMethod.GET, "/v1/brands/search").permitAll()                 // Search brands
 
+                        // Public/Unauthenticated Product endpoints
+                        .requestMatchers(HttpMethod.GET, "/v1/products/{productId}").permitAll()
+                        .requestMatchers(HttpMethod.GET, "/v1/products/slug/{slug}").permitAll()
+                        .requestMatchers(HttpMethod.GET, "/v1/products/sku/{sku}").permitAll()
+                        .requestMatchers(HttpMethod.GET, "/v1/products").permitAll()
+                        .requestMatchers(HttpMethod.GET, "/v1/products/status/{status}").permitAll()
+                        .requestMatchers(HttpMethod.GET, "/v1/products/featured").permitAll()
+                        .requestMatchers(HttpMethod.GET, "/v1/products/featured/status/{status}").permitAll()
+                        .requestMatchers(HttpMethod.GET, "/v1/products/brand/{brandId}").permitAll()
+                        .requestMatchers(HttpMethod.GET, "/v1/products/brand/{brandId}/status/{status}").permitAll()
+                        .requestMatchers(HttpMethod.GET, "/v1/products/search").permitAll()
+
                         .anyRequest().authenticated()
                 )
                 .sessionManagement(session ->
