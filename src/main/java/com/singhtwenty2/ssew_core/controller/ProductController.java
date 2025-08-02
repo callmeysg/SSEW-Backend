@@ -1,5 +1,6 @@
 package com.singhtwenty2.ssew_core.controller;
 
+import com.singhtwenty2.ssew_core.annotation.ApiDeprecated;
 import com.singhtwenty2.ssew_core.data.dto.catalog_management.ProductDTO.*;
 import com.singhtwenty2.ssew_core.data.dto.common.GlobalApiResponse;
 import com.singhtwenty2.ssew_core.data.dto.common.PageResponse;
@@ -55,6 +56,12 @@ public class ProductController {
     }
 
     @GetMapping("/{productId}")
+    @ApiDeprecated(
+            since = "2025-08-02",
+            replacement = "/v1/products/slug/{slug}",
+            sunsetDate = "2025-12-31",
+            message = "This endpoint is deprecated. Please use /v1/products/slug/{slug} instead for better SEO and performance."
+    )
     public ResponseEntity<GlobalApiResponse<ProductResponse>> getProductById(
             @PathVariable String productId,
             HttpServletRequest request
@@ -66,7 +73,7 @@ public class ProductController {
         return ResponseEntity.ok(
                 GlobalApiResponse.<ProductResponse>builder()
                         .success(true)
-                        .message("Product retrieved successfully")
+                        .message("Product retrieved successfully (DEPRECATED: Use /v1/products/slug/{slug} instead)")
                         .data(response)
                         .build()
         );
