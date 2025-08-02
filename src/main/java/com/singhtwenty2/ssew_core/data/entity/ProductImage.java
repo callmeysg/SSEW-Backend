@@ -36,8 +36,8 @@ public class ProductImage extends BaseEntity {
     @Column(name = "file_size")
     private Long fileSize;
 
-    @Column(name = "file_format", length = 10)
-    private String fileFormat;
+    @Column(name = "original_file_format", length = 10)
+    private String originalFileFormat;
 
     @Column(name = "width")
     private Integer width;

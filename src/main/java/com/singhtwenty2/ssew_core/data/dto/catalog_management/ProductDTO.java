@@ -5,7 +5,10 @@ import jakarta.validation.constraints.*;
 import lombok.*;
 
 import java.math.BigDecimal;
+import java.util.List;
 import java.util.Map;
+
+import static com.singhtwenty2.ssew_core.data.dto.catalog_management.ProductImageDTO.ImageInfo;
 
 public class ProductDTO {
 
@@ -168,6 +171,8 @@ public class ProductDTO {
         private String categoryId;
         private String categoryName;
         private Long imageCount;
+        private ImageInfo thumbnailImage;
+        private List<ImageInfo> catalogImages;
         private Boolean isInStock;
         private Boolean isLowStock;
         private Map<String, String> specifications;

@@ -2,10 +2,12 @@ package com.singhtwenty2.ssew_core.service.impls;
 
 import com.singhtwenty2.ssew_core.data.entity.Brand;
 import com.singhtwenty2.ssew_core.data.entity.Product;
+import com.singhtwenty2.ssew_core.data.entity.ProductImage;
 import com.singhtwenty2.ssew_core.data.enums.ProductStatus;
 import com.singhtwenty2.ssew_core.data.repository.BrandRepository;
 import com.singhtwenty2.ssew_core.data.repository.ProductRepository;
 import com.singhtwenty2.ssew_core.service.ProductService;
+import com.singhtwenty2.ssew_core.service.S3Service;
 import com.singhtwenty2.ssew_core.service.SkuGenerationService;
 import com.singhtwenty2.ssew_core.util.sanitizer.SpecificationSanitizer;
 import lombok.RequiredArgsConstructor;
@@ -24,6 +26,7 @@ import java.util.*;
 import java.util.stream.Collectors;
 
 import static com.singhtwenty2.ssew_core.data.dto.catalog_management.ProductDTO.*;
+import static com.singhtwenty2.ssew_core.data.dto.catalog_management.ProductImageDTO.ImageInfo;
 
 @Service
 @Slf4j
@@ -35,6 +38,7 @@ public class ProductServiceImpl implements ProductService {
     private final BrandRepository brandRepository;
     private final SkuGenerationService skuGenerationService;
     private final SpecificationSanitizer specificationSanitizer;
+    private final S3Service s3Service;
 
     @Override
     public ProductResponse createProduct(CreateProductRequest createProductRequest) {
@@ -370,6 +374,18 @@ public class ProductServiceImpl implements ProductService {
     private ProductResponse buildProductResponse(Product product) {
         Long imageCount = (long) product.getImages().size();
 
+        ImageInfo thumbnailImage = product.getImages().stream()
+                .filter(ProductImage::getIsThumbnail)
+                .findFirst()
+                .map(this::buildImageInfo)
+                .orElse(null);
+
+        List<ImageInfo> catalogImages = product.getImages().stream()
+                .filter(img -> !img.getIsThumbnail())
+                .sorted(Comparator.comparing(ProductImage::getDisplayOrder))
+                .map(this::buildImageInfo)
+                .collect(Collectors.toList());
+
         return ProductResponse.builder()
                 .productId(product.getId().toString())
                 .name(product.getName())
@@ -397,9 +413,25 @@ public class ProductServiceImpl implements ProductService {
                 .categoryId(product.getBrand().getCategory().getId().toString())
                 .categoryName(product.getBrand().getCategory().getName())
                 .imageCount(imageCount)
+                .thumbnailImage(thumbnailImage)
+                .catalogImages(catalogImages)
                 .isInStock(product.isInStock())
                 .isLowStock(product.isLowStock())
                 .specifications(product.getSpecifications() != null ? new HashMap<>(product.getSpecifications()) : new HashMap<>())
+                .build();
+    }
+
+    private ImageInfo buildImageInfo(ProductImage productImage) {
+        return ImageInfo.builder()
+                .imageId(productImage.getId().toString())
+                .objectKey(productImage.getImageUrl())
+                .accessUrl(s3Service.generateReadPresignedUrl(productImage.getImageUrl(), 60).getPresignedUrl())
+                .altText(productImage.getAltText())
+                .displayOrder(productImage.getDisplayOrder())
+                .fileSize(productImage.getFileSize())
+                .fileFormat(productImage.getOriginalFileFormat())
+                .width(productImage.getWidth())
+                .height(productImage.getHeight())
                 .build();
     }
 
