@@ -1,6 +1,6 @@
 package com.singhtwenty2.ssew_core.data.entity;
 
-import com.singhtwenty2.ssew_core.data.enums.ProductStatus;
+import com.singhtwenty2.ssew_core.data.enums.VariantType;
 import jakarta.persistence.*;
 import lombok.AllArgsConstructor;
 import lombok.Getter;
@@ -11,7 +11,6 @@ import org.hibernate.type.SqlTypes;
 
 import java.math.BigDecimal;
 import java.util.ArrayList;
-import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
@@ -19,13 +18,15 @@ import java.util.Map;
 @Table(
         name = "products",
         indexes = {
-                @Index(name = "idx_product_name", columnList = "name"),
-                @Index(name = "idx_product_slug", columnList = "slug", unique = true),
                 @Index(name = "idx_product_sku", columnList = "sku", unique = true),
+                @Index(name = "idx_product_model_number", columnList = "model_number", unique = true),
+                @Index(name = "idx_product_slug", columnList = "slug", unique = true),
                 @Index(name = "idx_product_brand", columnList = "brand_id"),
-                @Index(name = "idx_product_status", columnList = "status"),
+                @Index(name = "idx_product_active", columnList = "is_active"),
+                @Index(name = "idx_product_parent", columnList = "parent_product_id"),
+                @Index(name = "idx_product_variant_type", columnList = "variant_type"),
                 @Index(name = "idx_product_price", columnList = "price"),
-                @Index(name = "idx_product_stock", columnList = "stock_quantity")
+                @Index(name = "idx_product_created", columnList = "created_at")
         }
 )
 @Getter
@@ -37,11 +38,14 @@ public class Product extends BaseEntity {
     @Column(name = "name", nullable = false, length = 200)
     private String name;
 
-    @Column(name = "slug", nullable = false, unique = true, length = 220)
+    @Column(name = "slug", nullable = false, unique = true, length = 250)
     private String slug;
 
     @Column(name = "sku", nullable = false, unique = true, length = 50)
     private String sku;
+
+    @Column(name = "model_number", unique = true, length = 100)
+    private String modelNumber;
 
     @Column(name = "description", columnDefinition = "TEXT")
     private String description;
@@ -49,36 +53,27 @@ public class Product extends BaseEntity {
     @Column(name = "short_description", length = 500)
     private String shortDescription;
 
+    @JdbcTypeCode(SqlTypes.JSON)
+    @Column(name = "specifications", columnDefinition = "jsonb")
+    private Map<String, String> specifications;
+
     @Column(name = "price", nullable = false, precision = 10, scale = 2)
     private BigDecimal price;
 
-    @Column(name = "compare_price", precision = 10, scale = 2)
-    private BigDecimal comparePrice;
+    @Column(name = "compare_at_price", precision = 10, scale = 2)
+    private BigDecimal compareAtPrice;
 
     @Column(name = "cost_price", precision = 10, scale = 2)
     private BigDecimal costPrice;
 
-    @Column(name = "weight", precision = 8, scale = 3)
-    private BigDecimal weight;
-
-    @Column(name = "dimensions", length = 100)
-    private String dimensions;
-
-    @Column(name = "stock_quantity", nullable = false)
-    private Integer stockQuantity = 0;
-
-    @Column(name = "min_stock_level")
-    private Integer minStockLevel = 0;
-
-    @Column(name = "track_inventory", nullable = false)
-    private Boolean trackInventory = true;
-
-    @Enumerated(EnumType.STRING)
-    @Column(name = "status", nullable = false)
-    private ProductStatus status = ProductStatus.DRAFT;
+    @Column(name = "is_active", nullable = false)
+    private Boolean isActive = true;
 
     @Column(name = "is_featured", nullable = false)
     private Boolean isFeatured = false;
+
+    @Column(name = "display_order")
+    private Integer displayOrder = 0;
 
     @Column(name = "meta_title", length = 150)
     private String metaTitle;
@@ -86,65 +81,125 @@ public class Product extends BaseEntity {
     @Column(name = "meta_description", length = 300)
     private String metaDescription;
 
-    @Column(name = "tags", length = 500)
-    private String tags;
+    @Column(name = "meta_keywords", length = 500)
+    private String metaKeywords;
 
-    @JdbcTypeCode(SqlTypes.JSON)
-    @Column(name = "specifications", columnDefinition = "JSON")
-    private Map<String, String> specifications = new HashMap<>();
+    @Column(name = "search_tags", length = 1000)
+    private String searchTags;
+
+    @Column(name = "thumbnail_object_key", length = 500)
+    private String thumbnailObjectKey;
+
+    @Column(name = "thumbnail_file_size")
+    private Long thumbnailFileSize;
+
+    @Column(name = "thumbnail_content_type", length = 50)
+    private String thumbnailContentType;
+
+    @Column(name = "thumbnail_width")
+    private Integer thumbnailWidth;
+
+    @Column(name = "thumbnail_height")
+    private Integer thumbnailHeight;
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "brand_id", nullable = false)
     private Brand brand;
 
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "parent_product_id")
+    private Product parentProduct;
+
+    @OneToMany(mappedBy = "parentProduct", cascade = CascadeType.ALL, fetch = FetchType.LAZY)
+    private List<Product> variants = new ArrayList<>();
+
+    @Enumerated(EnumType.STRING)
+    @Column(name = "variant_type", length = 20)
+    private VariantType variantType = VariantType.STANDALONE;
+
+    @Column(name = "variant_position")
+    private Integer variantPosition;
+
     @OneToMany(mappedBy = "product", cascade = CascadeType.ALL, fetch = FetchType.LAZY, orphanRemoval = true)
-    private List<ProductImage> images = new ArrayList<>();
+    private List<ProductImage> productImages = new ArrayList<>();
 
-    public void addImage(ProductImage image) {
-        images.add(image);
-        image.setProduct(this);
-    }
+    public void addVariant(Product variant) {
+        variants.add(variant);
+        variant.setParentProduct(this);
+        variant.setVariantType(VariantType.VARIANT);
+        variant.setVariantPosition(variants.size());
 
-    public void removeImage(ProductImage image) {
-        images.remove(image);
-        image.setProduct(null);
-    }
-
-    public ProductImage getThumbnailImage() {
-        return images.stream()
-                .filter(ProductImage::getIsThumbnail)
-                .findFirst()
-                .orElse(null);
-    }
-
-    public List<ProductImage> getCatalogImages() {
-        return images.stream()
-                .filter(img -> !img.getIsThumbnail())
-                .toList();
-    }
-
-    public boolean isInStock() {
-        return stockQuantity > 0;
-    }
-
-    public boolean isLowStock() {
-        return stockQuantity <= minStockLevel;
-    }
-
-    public void addSpecification(String key, String value) {
-        if (specifications == null) {
-            specifications = new HashMap<>();
-        }
-        specifications.put(key, value);
-    }
-
-    public void removeSpecification(String key) {
-        if (specifications != null) {
-            specifications.remove(key);
+        if (this.variantType == VariantType.STANDALONE) {
+            this.variantType = VariantType.PARENT;
         }
     }
 
-    public String getSpecification(String key) {
-        return specifications != null ? specifications.get(key) : null;
+    public void removeVariant(Product variant) {
+        variants.remove(variant);
+        variant.setParentProduct(null);
+        variant.setVariantType(VariantType.STANDALONE);
+        variant.setVariantPosition(null);
+
+        if (variants.isEmpty() && this.variantType == VariantType.PARENT) {
+            this.variantType = VariantType.STANDALONE;
+        }
+
+        reorderVariantPositions();
+    }
+
+    public void addProductImage(ProductImage productImage) {
+        productImages.add(productImage);
+        productImage.setProduct(this);
+        productImage.setDisplayOrder(productImages.size());
+    }
+
+    public void removeProductImage(ProductImage productImage) {
+        productImages.remove(productImage);
+        productImage.setProduct(null);
+        reorderImagePositions();
+    }
+
+    private void reorderVariantPositions() {
+        for (int i = 0; i < variants.size(); i++) {
+            variants.get(i).setVariantPosition(i + 1);
+        }
+    }
+
+    private void reorderImagePositions() {
+        for (int i = 0; i < productImages.size(); i++) {
+            productImages.get(i).setDisplayOrder(i + 1);
+        }
+    }
+
+    public boolean isVariant() {
+        return variantType == VariantType.VARIANT;
+    }
+
+    public boolean hasVariants() {
+        return variantType == VariantType.PARENT && !variants.isEmpty();
+    }
+
+    public boolean isStandalone() {
+        return variantType == VariantType.STANDALONE;
+    }
+
+    public Product getRootProduct() {
+        return parentProduct != null ? parentProduct : this;
+    }
+
+    public List<Product> getAllVariants() {
+        return parentProduct != null ? parentProduct.getVariants() : this.getVariants();
+    }
+
+    public String getCategoryId() {
+        return brand != null && brand.getCategory() != null ? brand.getCategory().getId().toString() : null;
+    }
+
+    public String getCategoryName() {
+        return brand != null && brand.getCategory() != null ? brand.getCategory().getName() : null;
+    }
+
+    public String getBrandName() {
+        return brand != null ? brand.getName() : null;
     }
 }

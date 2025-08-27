@@ -10,9 +10,9 @@ import lombok.Setter;
 @Table(
         name = "product_images",
         indexes = {
-                @Index(name = "idx_product_images_product", columnList = "product_id"),
-                @Index(name = "idx_product_images_thumbnail", columnList = "is_thumbnail"),
-                @Index(name = "idx_product_images_order", columnList = "display_order")
+                @Index(name = "idx_product_image_product", columnList = "product_id"),
+                @Index(name = "idx_product_image_order", columnList = "display_order"),
+                @Index(name = "idx_product_image_alt", columnList = "alt_text")
         }
 )
 @Getter
@@ -21,31 +21,42 @@ import lombok.Setter;
 @AllArgsConstructor
 public class ProductImage extends BaseEntity {
 
-    @Column(name = "image_url", nullable = false, length = 500)
-    private String imageUrl;
+    @Column(name = "object_key", nullable = false, length = 500)
+    private String objectKey;
+
+    @Column(name = "file_size", nullable = false)
+    private Long fileSize;
+
+    @Column(name = "content_type", nullable = false, length = 50)
+    private String contentType;
+
+    @Column(name = "width", nullable = false)
+    private Integer width;
+
+    @Column(name = "height", nullable = false)
+    private Integer height;
 
     @Column(name = "alt_text", length = 200)
     private String altText;
 
-    @Column(name = "is_thumbnail", nullable = false)
-    private Boolean isThumbnail = false;
-
     @Column(name = "display_order", nullable = false)
-    private Integer displayOrder = 0;
+    private Integer displayOrder = 1;
 
-    @Column(name = "file_size")
-    private Long fileSize;
-
-    @Column(name = "original_file_format", length = 10)
-    private String originalFileFormat;
-
-    @Column(name = "width")
-    private Integer width;
-
-    @Column(name = "height")
-    private Integer height;
+    @Column(name = "is_primary", nullable = false)
+    private Boolean isPrimary = false;
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "product_id", nullable = false)
     private Product product;
+
+    public ProductImage(String objectKey, Long fileSize, String contentType,
+                        Integer width, Integer height, String altText, Product product) {
+        this.objectKey = objectKey;
+        this.fileSize = fileSize;
+        this.contentType = contentType;
+        this.width = width;
+        this.height = height;
+        this.altText = altText;
+        this.product = product;
+    }
 }

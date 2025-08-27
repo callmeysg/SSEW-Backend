@@ -1,10 +1,7 @@
 package com.singhtwenty2.ssew_core.controller;
 
-import com.singhtwenty2.ssew_core.annotation.ApiDeprecated;
-import com.singhtwenty2.ssew_core.data.dto.catalog_management.ProductDTO.*;
 import com.singhtwenty2.ssew_core.data.dto.common.GlobalApiResponse;
 import com.singhtwenty2.ssew_core.data.dto.common.PageResponse;
-import com.singhtwenty2.ssew_core.data.enums.ProductStatus;
 import com.singhtwenty2.ssew_core.service.ProductService;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
@@ -15,14 +12,18 @@ import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Sort;
 import org.springframework.http.HttpStatus;
+import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.web.multipart.MultipartFile;
 
 import java.math.BigDecimal;
 import java.util.List;
 import java.util.Map;
 
+import static com.singhtwenty2.ssew_core.data.dto.catalog_management.PreSignedUrlDTO.PresignedUrlResponse;
+import static com.singhtwenty2.ssew_core.data.dto.catalog_management.ProductDTO.*;
 import static com.singhtwenty2.ssew_core.util.io.NetworkUtils.getClientIP;
 
 @RestController
@@ -32,6 +33,16 @@ import static com.singhtwenty2.ssew_core.util.io.NetworkUtils.getClientIP;
 public class ProductController {
 
     private final ProductService productService;
+
+    private static final Map<String, String> SORT_FIELD_MAPPING = Map.of(
+            "created_at", "createdAt",
+            "updated_at", "updatedAt",
+            "name", "name",
+            "price", "price",
+            "sku", "sku",
+            "model_number", "modelNumber",
+            "display_order", "displayOrder"
+    );
 
     @PostMapping
     @PreAuthorize("hasRole('ADMIN')")
@@ -44,7 +55,7 @@ public class ProductController {
 
         ProductResponse response = productService.createProduct(createRequest);
 
-        log.info("Product created successfully with ID: {} and SKU: {}", response.getProductId(), response.getSku());
+        log.info("Product created successfully with ID: {}", response.getProductId());
 
         return ResponseEntity.status(HttpStatus.CREATED).body(
                 GlobalApiResponse.<ProductResponse>builder()
@@ -55,13 +66,30 @@ public class ProductController {
         );
     }
 
+    @PostMapping("/{productId}/variants")
+    @PreAuthorize("hasRole('ADMIN')")
+    public ResponseEntity<GlobalApiResponse<ProductResponse>> createVariant(
+            @PathVariable String productId,
+            @Valid @RequestBody CreateVariantRequest createRequest,
+            HttpServletRequest request
+    ) {
+        log.info("Variant creation attempt from IP: {} for parent product: {}",
+                getClientIP(request), productId);
+
+        ProductResponse response = productService.createVariant(productId, createRequest);
+
+        log.info("Variant created successfully with ID: {}", response.getProductId());
+
+        return ResponseEntity.status(HttpStatus.CREATED).body(
+                GlobalApiResponse.<ProductResponse>builder()
+                        .success(true)
+                        .message("Product variant created successfully")
+                        .data(response)
+                        .build()
+        );
+    }
+
     @GetMapping("/{productId}")
-    @ApiDeprecated(
-            since = "2025-08-02",
-            replacement = "/v1/products/slug/{slug}",
-            sunsetDate = "2025-12-31",
-            message = "This endpoint is deprecated. Please use /v1/products/slug/{slug} instead for better SEO and performance."
-    )
     public ResponseEntity<GlobalApiResponse<ProductResponse>> getProductById(
             @PathVariable String productId,
             HttpServletRequest request
@@ -73,7 +101,7 @@ public class ProductController {
         return ResponseEntity.ok(
                 GlobalApiResponse.<ProductResponse>builder()
                         .success(true)
-                        .message("Product retrieved successfully (DEPRECATED: Use /v1/products/slug/{slug} instead)")
+                        .message("Product retrieved successfully")
                         .data(response)
                         .build()
         );
@@ -115,233 +143,121 @@ public class ProductController {
         );
     }
 
-    @GetMapping
-    public ResponseEntity<GlobalApiResponse<PageResponse<ProductResponse>>> getAllProducts(
-            @RequestParam(defaultValue = "0") int index,
-            @RequestParam(defaultValue = "10") int limit,
-            @RequestParam(defaultValue = "createdAt") String sortBy,
-            @RequestParam(defaultValue = "desc") String sortDir,
-            HttpServletRequest request
-    ) {
-        log.debug("Fetching all products from IP: {}", getClientIP(request));
-
-        Sort sort = sortDir.equalsIgnoreCase("desc") ?
-                Sort.by(sortBy).descending() : Sort.by(sortBy).ascending();
-        Pageable pageable = PageRequest.of(index, limit, sort);
-
-        Page<ProductResponse> productPage = productService.getAllProducts(pageable);
-        PageResponse<ProductResponse> response = PageResponse.from(productPage);
-
-        return ResponseEntity.ok(
-                GlobalApiResponse.<PageResponse<ProductResponse>>builder()
-                        .success(true)
-                        .message("Products retrieved successfully")
-                        .data(response)
-                        .build()
-        );
-    }
-
-    @GetMapping("/status/{status}")
-    public ResponseEntity<GlobalApiResponse<PageResponse<ProductResponse>>> getProductsByStatus(
-            @PathVariable ProductStatus status,
-            @RequestParam(defaultValue = "0") int index,
-            @RequestParam(defaultValue = "10") int limit,
-            @RequestParam(defaultValue = "createdAt") String sortBy,
-            @RequestParam(defaultValue = "desc") String sortDir,
-            HttpServletRequest request
-    ) {
-        log.debug("Fetching products by status: {} from IP: {}", status, getClientIP(request));
-
-        Sort sort = sortDir.equalsIgnoreCase("desc") ?
-                Sort.by(sortBy).descending() : Sort.by(sortBy).ascending();
-        Pageable pageable = PageRequest.of(index, limit, sort);
-
-        Page<ProductResponse> productPage = productService.getProductsByStatus(status, pageable);
-        PageResponse<ProductResponse> response = PageResponse.from(productPage);
-
-        return ResponseEntity.ok(
-                GlobalApiResponse.<PageResponse<ProductResponse>>builder()
-                        .success(true)
-                        .message("Products retrieved successfully")
-                        .data(response)
-                        .build()
-        );
-    }
-
-    @GetMapping("/featured")
-    public ResponseEntity<GlobalApiResponse<PageResponse<ProductResponse>>> getFeaturedProducts(
-            @RequestParam(defaultValue = "0") int index,
-            @RequestParam(defaultValue = "10") int limit,
-            @RequestParam(defaultValue = "createdAt") String sortBy,
-            @RequestParam(defaultValue = "desc") String sortDir,
-            HttpServletRequest request
-    ) {
-        log.debug("Fetching featured products from IP: {}", getClientIP(request));
-
-        Sort sort = sortDir.equalsIgnoreCase("desc") ?
-                Sort.by(sortBy).descending() : Sort.by(sortBy).ascending();
-        Pageable pageable = PageRequest.of(index, limit, sort);
-
-        Page<ProductResponse> productPage = productService.getFeaturedProducts(pageable);
-        PageResponse<ProductResponse> response = PageResponse.from(productPage);
-
-        return ResponseEntity.ok(
-                GlobalApiResponse.<PageResponse<ProductResponse>>builder()
-                        .success(true)
-                        .message("Featured products retrieved successfully")
-                        .data(response)
-                        .build()
-        );
-    }
-
-    @GetMapping("/featured/status/{status}")
-    public ResponseEntity<GlobalApiResponse<PageResponse<ProductResponse>>> getFeaturedProductsByStatus(
-            @PathVariable ProductStatus status,
-            @RequestParam(defaultValue = "0") int index,
-            @RequestParam(defaultValue = "10") int limit,
-            @RequestParam(defaultValue = "createdAt") String sortBy,
-            @RequestParam(defaultValue = "desc") String sortDir,
-            HttpServletRequest request
-    ) {
-        log.debug("Fetching featured products by status: {} from IP: {}", status, getClientIP(request));
-
-        Sort sort = sortDir.equalsIgnoreCase("desc") ?
-                Sort.by(sortBy).descending() : Sort.by(sortBy).ascending();
-        Pageable pageable = PageRequest.of(index, limit, sort);
-
-        Page<ProductResponse> productPage = productService.getFeaturedProductsByStatus(status, pageable);
-        PageResponse<ProductResponse> response = PageResponse.from(productPage);
-
-        return ResponseEntity.ok(
-                GlobalApiResponse.<PageResponse<ProductResponse>>builder()
-                        .success(true)
-                        .message("Featured products retrieved successfully")
-                        .data(response)
-                        .build()
-        );
-    }
-
-    @GetMapping("/brand/{brandId}")
-    public ResponseEntity<GlobalApiResponse<PageResponse<ProductResponse>>> getProductsByBrand(
-            @PathVariable String brandId,
-            @RequestParam(defaultValue = "0") int index,
-            @RequestParam(defaultValue = "10") int limit,
-            @RequestParam(defaultValue = "createdAt") String sortBy,
-            @RequestParam(defaultValue = "desc") String sortDir,
-            HttpServletRequest request
-    ) {
-        log.debug("Fetching products by brand: {} from IP: {}", brandId, getClientIP(request));
-
-        Sort sort = sortDir.equalsIgnoreCase("desc") ?
-                Sort.by(sortBy).descending() : Sort.by(sortBy).ascending();
-        Pageable pageable = PageRequest.of(index, limit, sort);
-
-        Page<ProductResponse> productPage = productService.getProductsByBrand(brandId, pageable);
-        PageResponse<ProductResponse> response = PageResponse.from(productPage);
-
-        return ResponseEntity.ok(
-                GlobalApiResponse.<PageResponse<ProductResponse>>builder()
-                        .success(true)
-                        .message("Products retrieved successfully")
-                        .data(response)
-                        .build()
-        );
-    }
-
-    @GetMapping("/brand/{brandId}/status/{status}")
-    public ResponseEntity<GlobalApiResponse<PageResponse<ProductResponse>>> getProductsByBrandAndStatus(
-            @PathVariable String brandId,
-            @PathVariable ProductStatus status,
-            @RequestParam(defaultValue = "0") int index,
-            @RequestParam(defaultValue = "10") int limit,
-            @RequestParam(defaultValue = "createdAt") String sortBy,
-            @RequestParam(defaultValue = "desc") String sortDir,
-            HttpServletRequest request
-    ) {
-        log.debug("Fetching products by brand: {} and status: {} from IP: {}", brandId, status, getClientIP(request));
-
-        Sort sort = sortDir.equalsIgnoreCase("desc") ?
-                Sort.by(sortBy).descending() : Sort.by(sortBy).ascending();
-        Pageable pageable = PageRequest.of(index, limit, sort);
-
-        Page<ProductResponse> productPage = productService.getProductsByBrandAndStatus(brandId, status, pageable);
-        PageResponse<ProductResponse> response = PageResponse.from(productPage);
-
-        return ResponseEntity.ok(
-                GlobalApiResponse.<PageResponse<ProductResponse>>builder()
-                        .success(true)
-                        .message("Products retrieved successfully")
-                        .data(response)
-                        .build()
-        );
-    }
-
+    // Main endpoint for frontend - excludes variants
     @GetMapping("/search")
-    public ResponseEntity<GlobalApiResponse<PageResponse<ProductResponse>>> searchProducts(
-            @RequestParam(required = false) String name,
-            @RequestParam(required = false) String sku,
+    public ResponseEntity<GlobalApiResponse<PageResponse<ProductSummary>>> searchProducts(
+            @RequestParam(required = false) String keyword,
+            @RequestParam(required = false) String categoryId,
             @RequestParam(required = false) String brandId,
-            @RequestParam(required = false) ProductStatus status,
-            @RequestParam(required = false) Boolean isFeatured,
             @RequestParam(required = false) BigDecimal minPrice,
             @RequestParam(required = false) BigDecimal maxPrice,
+            @RequestParam(required = false) Boolean isFeatured,
+            @RequestParam(required = false) Boolean inStock,
+            @RequestParam(defaultValue = "created_at") String sortBy,
+            @RequestParam(defaultValue = "desc") String sortDirection,
             @RequestParam(defaultValue = "0") int index,
-            @RequestParam(defaultValue = "10") int limit,
-            @RequestParam(defaultValue = "createdAt") String sortBy,
-            @RequestParam(defaultValue = "desc") String sortDir,
+            @RequestParam(defaultValue = "20") int limit,
             HttpServletRequest request
     ) {
-        log.debug("Searching products from IP: {}", getClientIP(request));
+        log.debug("Searching products with filters from IP: {}", getClientIP(request));
 
-        Sort sort = sortDir.equalsIgnoreCase("desc") ?
-                Sort.by(sortBy).descending() : Sort.by(sortBy).ascending();
+        ProductSearchFilters filters = ProductSearchFilters.builder()
+                .keyword(keyword)
+                .categoryId(categoryId)
+                .brandId(brandId)
+                .minPrice(minPrice)
+                .maxPrice(maxPrice)
+                .isFeatured(isFeatured)
+                .inStock(inStock)
+                .sortBy(sortBy)
+                .sortDirection(sortDirection)
+                .page(index)
+                .size(limit)
+                .build();
+
+        String entitySortField = SORT_FIELD_MAPPING.getOrDefault(sortBy, "createdAt");
+
+        Sort sort = sortDirection.equalsIgnoreCase("desc") ?
+                Sort.by(entitySortField).descending() : Sort.by(entitySortField).ascending();
         Pageable pageable = PageRequest.of(index, limit, sort);
 
-        Page<ProductResponse> productPage = productService.searchProducts(
-                name, sku, brandId, status, isFeatured, minPrice, maxPrice, pageable);
-        PageResponse<ProductResponse> response = PageResponse.from(productPage);
+        Page<ProductSummary> productPage = productService.getAllProducts(filters, pageable);
+        PageResponse<ProductSummary> response = PageResponse.from(productPage);
 
         return ResponseEntity.ok(
-                GlobalApiResponse.<PageResponse<ProductResponse>>builder()
+                GlobalApiResponse.<PageResponse<ProductSummary>>builder()
                         .success(true)
-                        .message("Products search completed successfully")
+                        .message("Products retrieved successfully")
                         .data(response)
                         .build()
         );
     }
 
-    @GetMapping("/inventory/low-stock")
+    // Admin endpoint - includes all products including variants
+    @GetMapping("/admin/all")
     @PreAuthorize("hasRole('ADMIN')")
-    public ResponseEntity<GlobalApiResponse<List<ProductResponse>>> getLowStockProducts(
+    public ResponseEntity<GlobalApiResponse<PageResponse<ProductSummary>>> getAllProductsIncludingVariants(
+            @RequestParam(required = false) String keyword,
+            @RequestParam(required = false) String categoryId,
+            @RequestParam(required = false) String brandId,
+            @RequestParam(required = false) BigDecimal minPrice,
+            @RequestParam(required = false) BigDecimal maxPrice,
+            @RequestParam(required = false) Boolean isFeatured,
+            @RequestParam(required = false) Boolean inStock,
+            @RequestParam(defaultValue = "created_at") String sortBy,
+            @RequestParam(defaultValue = "desc") String sortDirection,
+            @RequestParam(defaultValue = "0") int index,
+            @RequestParam(defaultValue = "20") int limit,
             HttpServletRequest request
     ) {
-        log.debug("Fetching low stock products from IP: {}", getClientIP(request));
+        log.debug("Admin fetching all products including variants from IP: {}", getClientIP(request));
 
-        List<ProductResponse> response = productService.getLowStockProducts();
+        ProductSearchFilters filters = ProductSearchFilters.builder()
+                .keyword(keyword)
+                .categoryId(categoryId)
+                .brandId(brandId)
+                .minPrice(minPrice)
+                .maxPrice(maxPrice)
+                .isFeatured(isFeatured)
+                .inStock(inStock)
+                .sortBy(sortBy)
+                .sortDirection(sortDirection)
+                .page(index)
+                .size(limit)
+                .build();
+
+        String entitySortField = SORT_FIELD_MAPPING.getOrDefault(sortBy, "createdAt");
+
+        Sort sort = sortDirection.equalsIgnoreCase("desc") ?
+                Sort.by(entitySortField).descending() : Sort.by(entitySortField).ascending();
+        Pageable pageable = PageRequest.of(index, limit, sort);
+
+        Page<ProductSummary> productPage = productService.getAllProductsIncludingVariants(filters, pageable);
+        PageResponse<ProductSummary> response = PageResponse.from(productPage);
 
         return ResponseEntity.ok(
-                GlobalApiResponse.<List<ProductResponse>>builder()
+                GlobalApiResponse.<PageResponse<ProductSummary>>builder()
                         .success(true)
-                        .message("Low stock products retrieved successfully")
+                        .message("All products retrieved successfully")
                         .data(response)
                         .build()
         );
     }
 
-    @GetMapping("/inventory/out-of-stock")
-    @PreAuthorize("hasRole('ADMIN')")
-    public ResponseEntity<GlobalApiResponse<List<ProductResponse>>> getOutOfStockProducts(
+    @GetMapping("/{productId}/variants")
+    public ResponseEntity<GlobalApiResponse<List<ProductVariantInfo>>> getProductVariants(
+            @PathVariable String productId,
             HttpServletRequest request
     ) {
-        log.debug("Fetching out of stock products from IP: {}", getClientIP(request));
+        log.debug("Fetching variants for product: {} from IP: {}", productId, getClientIP(request));
 
-        List<ProductResponse> response = productService.getOutOfStockProducts();
+        List<ProductVariantInfo> variants = productService.getProductVariants(productId);
 
         return ResponseEntity.ok(
-                GlobalApiResponse.<List<ProductResponse>>builder()
+                GlobalApiResponse.<List<ProductVariantInfo>>builder()
                         .success(true)
-                        .message("Out of stock products retrieved successfully")
-                        .data(response)
+                        .message("Product variants retrieved successfully")
+                        .data(variants)
                         .build()
         );
     }
@@ -353,7 +269,8 @@ public class ProductController {
             @Valid @RequestBody UpdateProductRequest updateRequest,
             HttpServletRequest request
     ) {
-        log.info("Product update attempt from IP: {} for ID: {}", getClientIP(request), productId);
+        log.info("Product update attempt from IP: {} for ID: {}",
+                getClientIP(request), productId);
 
         ProductResponse response = productService.updateProduct(productId, updateRequest);
 
@@ -368,111 +285,127 @@ public class ProductController {
         );
     }
 
-    @PatchMapping("/{productId}/inventory")
-    @PreAuthorize("hasRole('ADMIN')")
-    public ResponseEntity<GlobalApiResponse<ProductResponse>> updateProductInventory(
-            @PathVariable String productId,
-            @Valid @RequestBody ProductInventoryUpdateRequest inventoryRequest,
-            HttpServletRequest request
-    ) {
-        log.info("Product inventory update attempt from IP: {} for ID: {}", getClientIP(request), productId);
-
-        ProductResponse response = productService.updateProductInventory(productId, inventoryRequest);
-
-        log.info("Product inventory updated successfully with ID: {}", productId);
-
-        return ResponseEntity.ok(
-                GlobalApiResponse.<ProductResponse>builder()
-                        .success(true)
-                        .message("Product inventory updated successfully")
-                        .data(response)
-                        .build()
-        );
-    }
-
-    @PatchMapping("/{productId}/status")
-    @PreAuthorize("hasRole('ADMIN')")
-    public ResponseEntity<GlobalApiResponse<ProductResponse>> updateProductStatus(
-            @PathVariable String productId,
-            @RequestParam ProductStatus status,
-            HttpServletRequest request
-    ) {
-        log.info("Product status update attempt from IP: {} for ID: {} to status: {}",
-                getClientIP(request), productId, status);
-
-        ProductResponse response = productService.updateProductStatus(productId, status);
-
-        log.info("Product status updated successfully with ID: {}", productId);
-
-        return ResponseEntity.ok(
-                GlobalApiResponse.<ProductResponse>builder()
-                        .success(true)
-                        .message("Product status updated successfully")
-                        .data(response)
-                        .build()
-        );
-    }
-
-    @PatchMapping("/{productId}/toggle-featured")
-    @PreAuthorize("hasRole('ADMIN')")
-    public ResponseEntity<GlobalApiResponse<ProductResponse>> toggleFeaturedStatus(
-            @PathVariable String productId,
-            HttpServletRequest request
-    ) {
-        log.info("Product featured status toggle attempt from IP: {} for ID: {}", getClientIP(request), productId);
-
-        ProductResponse response = productService.toggleFeaturedStatus(productId);
-
-        log.info("Product featured status toggled successfully with ID: {}", productId);
-
-        return ResponseEntity.ok(
-                GlobalApiResponse.<ProductResponse>builder()
-                        .success(true)
-                        .message("Product featured status toggled successfully")
-                        .data(response)
-                        .build()
-        );
-    }
-
-    @PatchMapping("/{productId}/specifications")
-    @PreAuthorize("hasRole('ADMIN')")
-    public ResponseEntity<GlobalApiResponse<ProductResponse>> updateProductSpecifications(
-            @PathVariable String productId,
-            @Valid @RequestBody ProductSpecificationUpdateRequest specificationRequest,
-            HttpServletRequest request
-    ) {
-        log.info("Product specifications update attempt from IP: {} for ID: {}", getClientIP(request), productId);
-
-        ProductResponse response = productService.updateProductSpecifications(productId, specificationRequest);
-
-        log.info("Product specifications updated successfully with ID: {}", productId);
-
-        return ResponseEntity.ok(
-                GlobalApiResponse.<ProductResponse>builder()
-                        .success(true)
-                        .message("Product specifications updated successfully")
-                        .data(response)
-                        .build()
-        );
-    }
-
     @DeleteMapping("/{productId}")
     @PreAuthorize("hasRole('ADMIN')")
-    public ResponseEntity<GlobalApiResponse<Map<String, Object>>> deleteProduct(
+    public ResponseEntity<GlobalApiResponse<Void>> deleteProduct(
             @PathVariable String productId,
             HttpServletRequest request
     ) {
-        log.info("Product deletion attempt from IP: {} for ID: {}", getClientIP(request), productId);
+        log.info("Product deletion attempt from IP: {} for ID: {}",
+                getClientIP(request), productId);
 
         productService.deleteProduct(productId);
 
         log.info("Product deleted successfully with ID: {}", productId);
 
         return ResponseEntity.ok(
-                GlobalApiResponse.<Map<String, Object>>builder()
+                GlobalApiResponse.<Void>builder()
                         .success(true)
                         .message("Product deleted successfully")
-                        .data(null)
+                        .build()
+        );
+    }
+
+    @PostMapping(value = "/{productId}/thumbnail", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+    @PreAuthorize("hasRole('ADMIN')")
+    public ResponseEntity<GlobalApiResponse<String>> uploadProductThumbnail(
+            @PathVariable String productId,
+            @RequestParam("thumbnail") MultipartFile file,
+            HttpServletRequest request
+    ) {
+        log.info("Thumbnail upload attempt from IP: {} for product: {}",
+                getClientIP(request), productId);
+
+        String objectKey = productService.uploadProductThumbnail(productId, file);
+
+        log.info("Thumbnail uploaded successfully for product: {}", productId);
+
+        return ResponseEntity.ok(
+                GlobalApiResponse.<String>builder()
+                        .success(true)
+                        .message("Product thumbnail uploaded successfully")
+                        .data(objectKey)
+                        .build()
+        );
+    }
+
+    @PostMapping(value = "/{productId}/images", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+    @PreAuthorize("hasRole('ADMIN')")
+    public ResponseEntity<GlobalApiResponse<List<String>>> uploadProductImages(
+            @PathVariable String productId,
+            @RequestParam("images") List<MultipartFile> files,
+            HttpServletRequest request
+    ) {
+        log.info("Images upload attempt from IP: {} for product: {} (count: {})",
+                getClientIP(request), productId, files.size());
+
+        List<String> objectKeys = productService.uploadProductImages(productId, files);
+
+        log.info("Images uploaded successfully for product: {} (count: {})", productId, objectKeys.size());
+
+        return ResponseEntity.ok(
+                GlobalApiResponse.<List<String>>builder()
+                        .success(true)
+                        .message("Product images uploaded successfully")
+                        .data(objectKeys)
+                        .build()
+        );
+    }
+
+    @DeleteMapping("/{productId}/images")
+    @PreAuthorize("hasRole('ADMIN')")
+    public ResponseEntity<GlobalApiResponse<Void>> deleteProductImageByQuery(
+            @PathVariable String productId,
+            @RequestParam String objectKey,
+            HttpServletRequest request
+    ) {
+        log.info("Image deletion attempt from IP: {} for product: {}, objectKey: {}",
+                getClientIP(request), productId, objectKey);
+
+        productService.deleteProductImageByObjectKey(productId, objectKey);
+
+        log.info("Image deleted successfully for product: {}, objectKey: {}", productId, objectKey);
+
+        return ResponseEntity.ok(
+                GlobalApiResponse.<Void>builder()
+                        .success(true)
+                        .message("Product image deleted successfully")
+                        .build()
+        );
+    }
+
+    @GetMapping("/images")
+    public ResponseEntity<GlobalApiResponse<PresignedUrlResponse>> getProductImageUrlByQuery(
+            @RequestParam String objectKey,
+            HttpServletRequest request
+    ) {
+        log.debug("Generating presigned URL for image: {} from IP: {}", objectKey, getClientIP(request));
+
+        PresignedUrlResponse response = productService.getProductImageUrl(objectKey);
+
+        return ResponseEntity.ok(
+                GlobalApiResponse.<PresignedUrlResponse>builder()
+                        .success(true)
+                        .message("Presigned URL generated successfully")
+                        .data(response)
+                        .build()
+        );
+    }
+
+    @GetMapping("/stats")
+    @PreAuthorize("hasRole('ADMIN')")
+    public ResponseEntity<GlobalApiResponse<ProductStatsResponse>> getProductStats(
+            HttpServletRequest request
+    ) {
+        log.debug("Fetching product stats from IP: {}", getClientIP(request));
+
+        ProductStatsResponse stats = productService.getProductStats();
+
+        return ResponseEntity.ok(
+                GlobalApiResponse.<ProductStatsResponse>builder()
+                        .success(true)
+                        .message("Product statistics retrieved successfully")
+                        .data(stats)
                         .build()
         );
     }

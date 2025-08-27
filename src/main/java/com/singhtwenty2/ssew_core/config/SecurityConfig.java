@@ -66,17 +66,13 @@ public class SecurityConfig {
                         .requestMatchers(HttpMethod.GET, "/v1/brands/category/*/ordered").permitAll()     // Get brands by category ordered
                         .requestMatchers(HttpMethod.GET, "/v1/brands/search").permitAll()                 // Search brands
 
-                        // Public/Unauthenticated Product endpoints
-                        .requestMatchers(HttpMethod.GET, "/v1/products/{productId}").permitAll()
-                        .requestMatchers(HttpMethod.GET, "/v1/products/slug/{slug}").permitAll()
-                        .requestMatchers(HttpMethod.GET, "/v1/products/sku/{sku}").permitAll()
-                        .requestMatchers(HttpMethod.GET, "/v1/products").permitAll()
-                        .requestMatchers(HttpMethod.GET, "/v1/products/status/{status}").permitAll()
-                        .requestMatchers(HttpMethod.GET, "/v1/products/featured").permitAll()
-                        .requestMatchers(HttpMethod.GET, "/v1/products/featured/status/{status}").permitAll()
-                        .requestMatchers(HttpMethod.GET, "/v1/products/brand/{brandId}").permitAll()
-                        .requestMatchers(HttpMethod.GET, "/v1/products/brand/{brandId}/status/{status}").permitAll()
-                        .requestMatchers(HttpMethod.GET, "/v1/products/search").permitAll()
+                        // Product GET endpoints (public access) - Updated with actual ProductController routes
+                        .requestMatchers(HttpMethod.GET, "/v1/products/{productId}").permitAll()          // Get product by ID
+                        .requestMatchers(HttpMethod.GET, "/v1/products/slug/{slug}").permitAll()          // Get product by slug
+                        .requestMatchers(HttpMethod.GET, "/v1/products/sku/{sku}").permitAll()            // Get product by SKU
+                        .requestMatchers(HttpMethod.GET, "/v1/products/search").permitAll()               // Search products with filters
+                        .requestMatchers(HttpMethod.GET, "/v1/products/{productId}/variants").permitAll() // Get product variants
+                        .requestMatchers(HttpMethod.GET, "/v1/products/images").permitAll() // Get product image presigned URL
 
                         .anyRequest().authenticated()
                 )

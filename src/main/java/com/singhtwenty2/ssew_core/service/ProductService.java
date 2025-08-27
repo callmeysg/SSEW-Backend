@@ -1,23 +1,20 @@
 package com.singhtwenty2.ssew_core.service;
 
-import com.singhtwenty2.ssew_core.data.dto.catalog_management.ProductDTO.CreateProductRequest;
-import com.singhtwenty2.ssew_core.data.dto.catalog_management.ProductDTO.ProductInventoryUpdateRequest;
-import com.singhtwenty2.ssew_core.data.dto.catalog_management.ProductDTO.ProductResponse;
-import com.singhtwenty2.ssew_core.data.dto.catalog_management.ProductDTO.UpdateProductRequest;
-import com.singhtwenty2.ssew_core.data.enums.ProductStatus;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
-import org.springframework.stereotype.Service;
+import org.springframework.web.multipart.MultipartFile;
 
-import java.math.BigDecimal;
 import java.util.List;
 
-import static com.singhtwenty2.ssew_core.data.dto.catalog_management.ProductDTO.ProductSpecificationUpdateRequest;
+import static com.singhtwenty2.ssew_core.data.dto.catalog_management.PreSignedUrlDTO.PresignedUrlResponse;
+import static com.singhtwenty2.ssew_core.data.dto.catalog_management.ProductDTO.*;
 
-@Service
 public interface ProductService {
 
-    ProductResponse createProduct(CreateProductRequest createProductRequest);
+    // Core CRUD operations
+    ProductResponse createProduct(CreateProductRequest request);
+
+    ProductResponse createVariant(String parentProductId, CreateVariantRequest request);
 
     ProductResponse getProductById(String productId);
 
@@ -25,42 +22,43 @@ public interface ProductService {
 
     ProductResponse getProductBySku(String sku);
 
-    Page<ProductResponse> getAllProducts(Pageable pageable);
-
-    Page<ProductResponse> getProductsByStatus(ProductStatus status, Pageable pageable);
-
-    Page<ProductResponse> getFeaturedProducts(Pageable pageable);
-
-    Page<ProductResponse> getProductsByBrand(String brandId, Pageable pageable);
-
-    Page<ProductResponse> getProductsByBrandAndStatus(String brandId, ProductStatus status, Pageable pageable);
-
-    Page<ProductResponse> getFeaturedProductsByStatus(ProductStatus status, Pageable pageable);
-
-    Page<ProductResponse> searchProducts(
-            String name,
-            String sku,
-            String brandId,
-            ProductStatus status,
-            Boolean isFeatured,
-            BigDecimal minPrice,
-            BigDecimal maxPrice,
-            Pageable pageable
-    );
-
-    List<ProductResponse> getLowStockProducts();
-
-    List<ProductResponse> getOutOfStockProducts();
-
-    ProductResponse updateProduct(String productId, UpdateProductRequest updateProductRequest);
-
-    ProductResponse updateProductInventory(String productId, ProductInventoryUpdateRequest inventoryUpdateRequest);
-
-    ProductResponse updateProductStatus(String productId, ProductStatus status);
-
-    ProductResponse toggleFeaturedStatus(String productId);
-
-    ProductResponse updateProductSpecifications(String productId, ProductSpecificationUpdateRequest specificationRequest);
+    ProductResponse updateProduct(String productId, UpdateProductRequest request);
 
     void deleteProduct(String productId);
+
+    // Product listing and search
+
+    /**
+     * Get all products excluding variants (for frontend/customer facing API)
+     * Returns only PARENT and STANDALONE products
+     */
+    Page<ProductSummary> getAllProducts(ProductSearchFilters filters, Pageable pageable);
+
+    /**
+     * Get all products including variants (for admin purposes)
+     * Returns PARENT, STANDALONE, and VARIANT products
+     */
+    Page<ProductSummary> getAllProductsIncludingVariants(ProductSearchFilters filters, Pageable pageable);
+
+    List<ProductVariantInfo> getProductVariants(String productId);
+
+    // Image management
+    String uploadProductThumbnail(String productId, MultipartFile file);
+
+    List<String> uploadProductImages(String productId, List<MultipartFile> files);
+
+    /**
+     * Delete product image by image ID
+     */
+    void deleteProductImage(String productId, String imageId);
+
+    /**
+     * Delete product image by object key (supports both thumbnail and catalog images)
+     */
+    void deleteProductImageByObjectKey(String productId, String objectKey);
+
+    PresignedUrlResponse getProductImageUrl(String objectKey);
+
+    // Statistics and analytics
+    ProductStatsResponse getProductStats();
 }

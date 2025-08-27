@@ -1,10 +1,7 @@
 package com.singhtwenty2.ssew_core.data.repository;
 
-import com.singhtwenty2.ssew_core.data.entity.Product;
 import com.singhtwenty2.ssew_core.data.entity.ProductImage;
-import org.springframework.data.domain.Sort;
 import org.springframework.data.jpa.repository.JpaRepository;
-import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
@@ -16,37 +13,41 @@ import java.util.UUID;
 @Repository
 public interface ProductImageRepository extends JpaRepository<ProductImage, UUID> {
 
-    List<ProductImage> findByProduct(Product product, Sort sort);
-
-    List<ProductImage> findByProductId(UUID productId, Sort sort);
-
-    Optional<ProductImage> findByProductIdAndIsThumbnailTrue(UUID productId);
-
-    List<ProductImage> findByProductIdAndIsThumbnailFalse(UUID productId, Sort sort);
-
+    /**
+     * Find product image by ID and product ID
+     */
     Optional<ProductImage> findByIdAndProductId(UUID imageId, UUID productId);
 
-    boolean existsByProductIdAndIsThumbnailTrue(UUID productId);
+    /**
+     * Find product image by object key and product ID
+     */
+    @Query("SELECT pi FROM ProductImage pi WHERE pi.objectKey = :objectKey AND pi.product.id = :productId")
+    Optional<ProductImage> findByObjectKeyAndProductId(@Param("objectKey") String objectKey, @Param("productId") UUID productId);
 
+    /**
+     * Check if product image exists by object key
+     */
+    boolean existsByObjectKey(String objectKey);
+
+    /**
+     * Count images for a specific product
+     */
     long countByProductId(UUID productId);
 
-    @Query("SELECT pi FROM ProductImage pi WHERE pi.product.id = :productId AND pi.displayOrder > :displayOrder")
-    List<ProductImage> findByProductIdAndDisplayOrderGreaterThan(@Param("productId") UUID productId, @Param("displayOrder") Integer displayOrder);
+    /**
+     * Find all images for a specific product ordered by display order
+     */
+    @Query("SELECT pi FROM ProductImage pi WHERE pi.product.id = :productId ORDER BY pi.displayOrder ASC")
+    java.util.List<ProductImage> findByProductIdOrderByDisplayOrderAsc(@Param("productId") UUID productId);
 
-    @Modifying
-    @Query("UPDATE ProductImage pi SET pi.displayOrder = pi.displayOrder - 1 WHERE pi.product.id = :productId AND pi.displayOrder > :displayOrder")
-    void decrementDisplayOrderAfter(@Param("productId") UUID productId, @Param("displayOrder") Integer displayOrder);
+    /**
+     * Find primary image for a product
+     */
+    Optional<ProductImage> findByProductIdAndIsPrimaryTrue(UUID productId);
 
-    @Modifying
-    @Query("UPDATE ProductImage pi SET pi.displayOrder = pi.displayOrder + 1 WHERE pi.product.id = :productId AND pi.displayOrder >= :displayOrder")
-    void incrementDisplayOrderFrom(@Param("productId") UUID productId, @Param("displayOrder") Integer displayOrder);
-
-    @Query("SELECT MAX(pi.displayOrder) FROM ProductImage pi WHERE pi.product.id = :productId")
-    Optional<Integer> findMaxDisplayOrderByProductId(@Param("productId") UUID productId);
-
-    @Modifying
-    @Query("UPDATE ProductImage pi SET pi.isThumbnail = false WHERE pi.product.id = :productId")
-    void clearThumbnailStatusForProduct(@Param("productId") UUID productId);
-
-    void deleteByProductId(UUID productId);
+    /**
+     * Find all product images for a specific product ordered by display order
+     */
+    @Query("SELECT pi FROM ProductImage pi WHERE pi.product.id = :productId ORDER BY pi.displayOrder ASC")
+    List<ProductImage> findByProductIdOrderByDisplayOrder(@Param("productId") UUID productId);
 }

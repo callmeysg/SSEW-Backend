@@ -3,569 +3,882 @@ package com.singhtwenty2.ssew_core.service.impls;
 import com.singhtwenty2.ssew_core.data.entity.Brand;
 import com.singhtwenty2.ssew_core.data.entity.Product;
 import com.singhtwenty2.ssew_core.data.entity.ProductImage;
-import com.singhtwenty2.ssew_core.data.enums.ProductStatus;
+import com.singhtwenty2.ssew_core.data.enums.VariantType;
 import com.singhtwenty2.ssew_core.data.repository.BrandRepository;
+import com.singhtwenty2.ssew_core.data.repository.ProductImageRepository;
 import com.singhtwenty2.ssew_core.data.repository.ProductRepository;
+import com.singhtwenty2.ssew_core.exception.BusinessException;
+import com.singhtwenty2.ssew_core.exception.ResourceNotFoundException;
+import com.singhtwenty2.ssew_core.service.ImageProcessingService;
 import com.singhtwenty2.ssew_core.service.ProductService;
 import com.singhtwenty2.ssew_core.service.S3Service;
-import com.singhtwenty2.ssew_core.service.SkuGenerationService;
+import com.singhtwenty2.ssew_core.util.SlugGenerator;
 import com.singhtwenty2.ssew_core.util.sanitizer.SpecificationSanitizer;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageImpl;
 import org.springframework.data.domain.Pageable;
-import org.springframework.http.HttpStatus;
+import org.springframework.data.jpa.domain.Specification;
+import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-import org.springframework.util.StringUtils;
-import org.springframework.web.server.ResponseStatusException;
+import org.springframework.web.multipart.MultipartFile;
 
 import java.math.BigDecimal;
-import java.time.LocalDateTime;
+import java.time.format.DateTimeFormatter;
 import java.util.*;
+import java.util.concurrent.ThreadLocalRandom;
 import java.util.stream.Collectors;
 
+import static com.singhtwenty2.ssew_core.data.dto.catalog_management.ImageDTO.ImageUploadResult;
+import static com.singhtwenty2.ssew_core.data.dto.catalog_management.ImageDTO.ProcessedImageResult;
+import static com.singhtwenty2.ssew_core.data.dto.catalog_management.PreSignedUrlDTO.PresignedUrlResponse;
 import static com.singhtwenty2.ssew_core.data.dto.catalog_management.ProductDTO.*;
-import static com.singhtwenty2.ssew_core.data.dto.catalog_management.ProductImageDTO.ImageInfo;
 
 @Service
+@RequiredArgsConstructor
 @Slf4j
 @Transactional
-@RequiredArgsConstructor
 public class ProductServiceImpl implements ProductService {
 
     private final ProductRepository productRepository;
     private final BrandRepository brandRepository;
-    private final SkuGenerationService skuGenerationService;
-    private final SpecificationSanitizer specificationSanitizer;
+    private final ProductImageRepository productImageRepository;
     private final S3Service s3Service;
+    private final ImageProcessingService imageProcessingService;
+    private final SpecificationSanitizer specificationSanitizer;
+    private final SlugGenerator slugGenerator;
 
     @Override
-    public ProductResponse createProduct(CreateProductRequest createProductRequest) {
-        log.debug("Creating product with name: {}", createProductRequest.getName());
+    public ProductResponse createProduct(CreateProductRequest request) {
+        log.info("Creating product with name: {}", request.getName());
 
-        validateCreateProductRequest(createProductRequest);
+        Brand brand = brandRepository.findById(UUID.fromString(request.getBrandId()))
+                .orElseThrow(() -> new ResourceNotFoundException("Brand not found with ID: " + request.getBrandId()));
 
-        Brand brand = findBrandById(createProductRequest.getBrandId());
+        Product parentProduct = null;
+        if (request.getParentProductId() != null) {
+            parentProduct = productRepository.findById(UUID.fromString(request.getParentProductId()))
+                    .orElseThrow(() -> new ResourceNotFoundException("Parent product not found"));
 
-        String slug = generateSlug(createProductRequest.getName());
-        validateUniqueSlug(slug);
+            if (!parentProduct.getVariantType().equals(VariantType.PARENT) &&
+                !parentProduct.getVariantType().equals(VariantType.STANDALONE)) {
+                throw new BusinessException("Cannot create variant for a variant product");
+            }
+        }
 
-        String sku = skuGenerationService.generateUniqueSku(brand);
+        validateProductData(request, null);
 
-        Product product = createProductFromRequest(createProductRequest, brand, slug, sku);
-        Product savedProduct = productRepository.save(product);
+        Product product = new Product();
+        mapCreateRequestToProduct(request, product, brand, parentProduct);
 
-        log.info("Product created successfully with ID: {} and SKU: {}", savedProduct.getId(), savedProduct.getSku());
+        String sku = generateUniqueSku(brand, parentProduct, request.getName());
+        product.setSku(sku);
+        product.setSlug(generateUniqueSlug(request.getName()));
 
-        return buildProductResponse(savedProduct);
+        product = productRepository.save(product);
+
+        if (parentProduct != null) {
+            parentProduct.addVariant(product);
+            productRepository.save(parentProduct);
+            inheritParentImages(parentProduct, product);
+            product = productRepository.save(product);
+        }
+
+        log.info("Product created successfully with ID: {}", product.getId());
+        return mapProductToResponse(product, false);
+    }
+
+    @Override
+    public ProductResponse createVariant(String parentProductId, CreateVariantRequest request) {
+        log.info("Creating variant for parent product: {}", parentProductId);
+
+        Product parentProduct = productRepository.findById(UUID.fromString(parentProductId))
+                .orElseThrow(() -> new ResourceNotFoundException("Parent product not found"));
+
+        if (parentProduct.getVariantType().equals(VariantType.VARIANT)) {
+            throw new BusinessException("Cannot create variant for a variant product");
+        }
+
+        Brand brand = parentProduct.getBrand();
+
+        Product variant = new Product();
+        mapVariantRequestToProduct(request, variant, brand);
+
+        String sku = generateUniqueSku(brand, parentProduct, request.getName());
+        variant.setSku(sku);
+        variant.setSlug(generateUniqueSlug(request.getName()));
+
+        variant.setParentProduct(parentProduct);
+        variant.setVariantType(VariantType.VARIANT);
+
+        variant = productRepository.save(variant);
+
+        parentProduct.addVariant(variant);
+        inheritParentImages(parentProduct, variant);
+
+        productRepository.save(parentProduct);
+        variant = productRepository.save(variant);
+
+        log.info("Variant created successfully with ID: {}", variant.getId());
+        return mapProductToResponse(variant, false);
     }
 
     @Override
     @Transactional(readOnly = true)
     public ProductResponse getProductById(String productId) {
-        log.debug("Fetching product by ID: {}", productId);
-
-        Product product = findProductById(productId);
-        return buildProductResponse(product);
+        Product product = productRepository.findById(UUID.fromString(productId))
+                .orElseThrow(() -> new ResourceNotFoundException("Product not found with ID: " + productId));
+        return mapProductToResponse(product, true);
     }
 
     @Override
     @Transactional(readOnly = true)
     public ProductResponse getProductBySlug(String slug) {
-        log.debug("Fetching product by slug: {}", slug);
-
-        Optional<Product> productOptional = productRepository.findBySlug(slug);
-        if (productOptional.isEmpty()) {
-            throw new ResponseStatusException(HttpStatus.NOT_FOUND, "Product not found with slug: " + slug);
-        }
-
-        return buildProductResponse(productOptional.get());
+        Product product = productRepository.findBySlug(slug)
+                .orElseThrow(() -> new ResourceNotFoundException("Product not found with slug: " + slug));
+        return mapProductToResponse(product, true);
     }
 
     @Override
     @Transactional(readOnly = true)
     public ProductResponse getProductBySku(String sku) {
-        log.debug("Fetching product by SKU: {}", sku);
+        Product product = productRepository.findBySku(sku)
+                .orElseThrow(() -> new ResourceNotFoundException("Product not found with SKU: " + sku));
+        return mapProductToResponse(product, true);
+    }
 
-        Optional<Product> productOptional = productRepository.findBySku(sku);
-        if (productOptional.isEmpty()) {
-            throw new ResponseStatusException(HttpStatus.NOT_FOUND, "Product not found with SKU: " + sku);
+    @Override
+    public ProductResponse updateProduct(String productId, UpdateProductRequest request) {
+        log.info("Updating product with ID: {}", productId);
+
+        Product product = productRepository.findById(UUID.fromString(productId))
+                .orElseThrow(() -> new ResourceNotFoundException("Product not found with ID: " + productId));
+
+        validateProductUpdateData(request, product);
+
+        mapUpdateRequestToProduct(request, product);
+
+        if (request.getBrandId() != null && !request.getBrandId().equals(product.getBrand().getId().toString())) {
+            Brand newBrand = brandRepository.findById(UUID.fromString(request.getBrandId()))
+                    .orElseThrow(() -> new ResourceNotFoundException("Brand not found"));
+            product.setBrand(newBrand);
         }
 
-        return buildProductResponse(productOptional.get());
-    }
-
-    @Override
-    @Transactional(readOnly = true)
-    public Page<ProductResponse> getAllProducts(Pageable pageable) {
-        log.debug("Fetching all products with pagination");
-
-        Page<Product> products = productRepository.findAll(pageable);
-        return products.map(this::buildProductResponse);
-    }
-
-    @Override
-    @Transactional(readOnly = true)
-    public Page<ProductResponse> getProductsByStatus(ProductStatus status, Pageable pageable) {
-        log.debug("Fetching products by status: {}", status);
-
-        Page<Product> products = productRepository.findByStatus(status, pageable);
-        return products.map(this::buildProductResponse);
-    }
-
-    @Override
-    @Transactional(readOnly = true)
-    public Page<ProductResponse> getFeaturedProducts(Pageable pageable) {
-        log.debug("Fetching featured products with pagination");
-
-        Page<Product> products = productRepository.findByIsFeaturedTrue(pageable);
-        return products.map(this::buildProductResponse);
-    }
-
-    @Override
-    @Transactional(readOnly = true)
-    public Page<ProductResponse> getProductsByBrand(String brandId, Pageable pageable) {
-        log.debug("Fetching products by brand ID: {}", brandId);
-
-        Brand brand = findBrandById(brandId);
-        Page<Product> products = productRepository.findByBrand(brand, pageable);
-        return products.map(this::buildProductResponse);
-    }
-
-    @Override
-    @Transactional(readOnly = true)
-    public Page<ProductResponse> getProductsByBrandAndStatus(String brandId, ProductStatus status, Pageable pageable) {
-        log.debug("Fetching products by brand ID: {} and status: {}", brandId, status);
-
-        Brand brand = findBrandById(brandId);
-        Page<Product> products = productRepository.findByBrandAndStatus(brand, status, pageable);
-        return products.map(this::buildProductResponse);
-    }
-
-    @Override
-    @Transactional(readOnly = true)
-    public Page<ProductResponse> getFeaturedProductsByStatus(ProductStatus status, Pageable pageable) {
-        log.debug("Fetching featured products by status: {}", status);
-
-        Page<Product> products = productRepository.findByStatusAndIsFeaturedTrue(status, pageable);
-        return products.map(this::buildProductResponse);
-    }
-
-    @Override
-    @Transactional(readOnly = true)
-    public Page<ProductResponse> searchProducts(
-            String name,
-            String sku,
-            String brandId,
-            ProductStatus status,
-            Boolean isFeatured,
-            BigDecimal minPrice,
-            BigDecimal maxPrice,
-            Pageable pageable) {
-        log.debug("Searching products with filters");
-
-        UUID brandUuid = null;
-        if (StringUtils.hasText(brandId)) {
-            try {
-                brandUuid = UUID.fromString(brandId);
-            } catch (IllegalArgumentException e) {
-                throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Invalid brand ID format");
-            }
-        }
-
-        Page<Product> products = productRepository.findProductsWithFilters(
-                name, sku, brandUuid, status, isFeatured, minPrice, maxPrice, pageable);
-        return products.map(this::buildProductResponse);
-    }
-
-    @Override
-    @Transactional(readOnly = true)
-    public List<ProductResponse> getLowStockProducts() {
-        log.debug("Fetching low stock products");
-
-        List<Product> products = productRepository.findLowStockProducts();
-        return products.stream()
-                .map(this::buildProductResponse)
-                .collect(Collectors.toList());
-    }
-
-    @Override
-    @Transactional(readOnly = true)
-    public List<ProductResponse> getOutOfStockProducts() {
-        log.debug("Fetching out of stock products");
-
-        List<Product> products = productRepository.findOutOfStockProducts();
-        return products.stream()
-                .map(this::buildProductResponse)
-                .collect(Collectors.toList());
-    }
-
-    @Override
-    public ProductResponse updateProduct(String productId, UpdateProductRequest updateProductRequest) {
-        log.debug("Updating product with ID: {}", productId);
-
-        Product existingProduct = findProductById(productId);
-        updateProductFields(existingProduct, updateProductRequest);
-
-        Product updatedProduct = productRepository.save(existingProduct);
-
-        log.info("Product updated successfully with ID: {}", updatedProduct.getId());
-
-        return buildProductResponse(updatedProduct);
-    }
-
-    @Override
-    public ProductResponse updateProductInventory(String productId, ProductInventoryUpdateRequest inventoryUpdateRequest) {
-        log.debug("Updating product inventory for ID: {}", productId);
-
-        Product product = findProductById(productId);
-
-        product.setStockQuantity(inventoryUpdateRequest.getStockQuantity());
-
-        if (inventoryUpdateRequest.getMinStockLevel() != null) {
-            product.setMinStockLevel(inventoryUpdateRequest.getMinStockLevel());
-        }
-
-        if (inventoryUpdateRequest.getTrackInventory() != null) {
-            product.setTrackInventory(inventoryUpdateRequest.getTrackInventory());
-        }
-
-        product.setUpdatedAt(LocalDateTime.now());
-
-        Product updatedProduct = productRepository.save(product);
-
-        log.info("Product inventory updated successfully for ID: {}", productId);
-
-        return buildProductResponse(updatedProduct);
-    }
-
-    @Override
-    public ProductResponse updateProductStatus(String productId, ProductStatus status) {
-        log.debug("Updating product status for ID: {} to: {}", productId, status);
-
-        Product product = findProductById(productId);
-        product.setStatus(status);
-        product.setUpdatedAt(LocalDateTime.now());
-
-        Product updatedProduct = productRepository.save(product);
-
-        log.info("Product status updated successfully for ID: {}, new status: {}", productId, status);
-
-        return buildProductResponse(updatedProduct);
-    }
-
-    @Override
-    public ProductResponse toggleFeaturedStatus(String productId) {
-        log.debug("Toggling featured status for product ID: {}", productId);
-
-        Product product = findProductById(productId);
-        product.setIsFeatured(!product.getIsFeatured());
-        product.setUpdatedAt(LocalDateTime.now());
-
-        Product updatedProduct = productRepository.save(product);
-
-        log.info("Product featured status toggled successfully for ID: {}, new status: {}", productId, product.getIsFeatured());
-
-        return buildProductResponse(updatedProduct);
-    }
-
-    @Override
-    public ProductResponse updateProductSpecifications(String productId, ProductSpecificationUpdateRequest specificationRequest) {
-        log.debug("Updating product specifications for ID: {}", productId);
-
-        Product product = findProductById(productId);
-
-        Map<String, String> sanitizedSpecs = specificationSanitizer.sanitizeSpecifications(specificationRequest.getSpecifications());
-        product.setSpecifications(sanitizedSpecs);
-        product.setUpdatedAt(LocalDateTime.now());
-
-        Product updatedProduct = productRepository.save(product);
-
-        log.info("Product specifications updated successfully for ID: {}", productId);
-
-        return buildProductResponse(updatedProduct);
+        product = productRepository.save(product);
+        log.info("Product updated successfully with ID: {}", productId);
+        return mapProductToResponse(product, true);
     }
 
     @Override
     public void deleteProduct(String productId) {
-        log.debug("Deleting product with ID: {}", productId);
+        log.info("Deleting product with ID: {}", productId);
 
-        Product product = findProductById(productId);
+        Product product = productRepository.findById(UUID.fromString(productId))
+                .orElseThrow(() -> new ResourceNotFoundException("Product not found with ID: " + productId));
 
+        if (product.hasVariants()) {
+            throw new BusinessException("Cannot delete product with variants. Delete variants first.");
+        }
+
+        deleteProductImages(product);
         productRepository.delete(product);
 
         log.info("Product deleted successfully with ID: {}", productId);
     }
 
-    private void validateCreateProductRequest(CreateProductRequest request) {
-        if (!StringUtils.hasText(request.getName()) || request.getName().trim().length() < 2) {
-            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Product name must be at least 2 characters long");
-        }
+    @Override
+    @Transactional(readOnly = true)
+    public Page<ProductSummary> getAllProducts(ProductSearchFilters filters, Pageable pageable) {
+        // Modified to return only PARENT and STANDALONE products, not variants
+        Specification<Product> spec = buildProductSpecificationExcludingVariants(filters);
+        Page<Product> productPage = productRepository.findAll(spec, pageable);
 
-        if (!StringUtils.hasText(request.getBrandId())) {
-            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Brand ID is required");
-        }
-
-        if (request.getComparePrice() != null && request.getPrice().compareTo(request.getComparePrice()) > 0) {
-            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Price cannot be greater than compare price");
-        }
-    }
-
-    private Brand findBrandById(String brandId) {
-        try {
-            UUID brandUuid = UUID.fromString(brandId);
-            Optional<Brand> brandOptional = brandRepository.findById(brandUuid);
-
-            if (brandOptional.isEmpty()) {
-                throw new ResponseStatusException(HttpStatus.NOT_FOUND, "Brand not found with ID: " + brandId);
-            }
-
-            return brandOptional.get();
-        } catch (IllegalArgumentException e) {
-            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Invalid brand ID format");
-        }
-    }
-
-    private String generateSlug(String name) {
-        return name.toLowerCase()
-                .replaceAll("[^a-z0-9\\s]", "")
-                .replaceAll("\\s+", "-")
-                .trim();
-    }
-
-    private void validateUniqueSlug(String slug) {
-        if (productRepository.existsBySlug(slug)) {
-            throw new ResponseStatusException(HttpStatus.CONFLICT, "Product with this slug already exists");
-        }
-    }
-
-    private Product createProductFromRequest(CreateProductRequest request, Brand brand, String slug, String sku) {
-        Product product = new Product();
-        product.setName(request.getName().trim());
-        product.setSlug(slug);
-        product.setSku(sku);
-        product.setDescription(StringUtils.hasText(request.getDescription()) ? request.getDescription().trim() : null);
-        product.setShortDescription(StringUtils.hasText(request.getShortDescription()) ? request.getShortDescription().trim() : null);
-        product.setPrice(request.getPrice());
-        product.setComparePrice(request.getComparePrice());
-        product.setCostPrice(request.getCostPrice());
-        product.setWeight(request.getWeight());
-        product.setDimensions(StringUtils.hasText(request.getDimensions()) ? request.getDimensions().trim() : null);
-        product.setStockQuantity(request.getStockQuantity());
-        product.setMinStockLevel(request.getMinStockLevel());
-        product.setTrackInventory(request.getTrackInventory());
-        product.setStatus(request.getStatus());
-        product.setIsFeatured(request.getIsFeatured());
-        product.setMetaTitle(StringUtils.hasText(request.getMetaTitle()) ? request.getMetaTitle().trim() : null);
-        product.setMetaDescription(StringUtils.hasText(request.getMetaDescription()) ? request.getMetaDescription().trim() : null);
-        product.setTags(StringUtils.hasText(request.getTags()) ? request.getTags().trim() : null);
-        product.setBrand(brand);
-        product.setCreatedAt(LocalDateTime.now());
-        product.setUpdatedAt(LocalDateTime.now());
-
-        if (request.getSpecifications() != null && !request.getSpecifications().isEmpty()) {
-            product.setSpecifications(specificationSanitizer.sanitizeSpecifications(request.getSpecifications()));
-        }
-
-        return product;
-    }
-
-    private ProductResponse buildProductResponse(Product product) {
-        Long imageCount = (long) product.getImages().size();
-
-        ImageInfo thumbnailImage = product.getImages().stream()
-                .filter(ProductImage::getIsThumbnail)
-                .findFirst()
-                .map(this::buildImageInfo)
-                .orElse(null);
-
-        List<ImageInfo> catalogImages = product.getImages().stream()
-                .filter(img -> !img.getIsThumbnail())
-                .sorted(Comparator.comparing(ProductImage::getDisplayOrder))
-                .map(this::buildImageInfo)
+        List<ProductSummary> summaries = productPage.getContent().stream()
+                .map(this::mapProductToSummary)
                 .collect(Collectors.toList());
 
-        return ProductResponse.builder()
+        return new PageImpl<>(summaries, pageable, productPage.getTotalElements());
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public Page<ProductSummary> getAllProductsIncludingVariants(ProductSearchFilters filters, Pageable pageable) {
+        // New method that includes variants for admin purposes
+        Specification<Product> spec = buildProductSpecification(filters);
+        Page<Product> productPage = productRepository.findAll(spec, pageable);
+        return productPage.map(this::mapProductToSummary);
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public List<ProductVariantInfo> getProductVariants(String productId) {
+        Product product = productRepository.findById(UUID.fromString(productId))
+                .orElseThrow(() -> new ResourceNotFoundException("Product not found with ID: " + productId));
+
+        if (!product.hasVariants()) {
+            return Collections.emptyList();
+        }
+
+        return product.getVariants().stream()
+                .map(this::mapProductToVariantInfo)
+                .collect(Collectors.toList());
+    }
+
+    @Override
+    public String uploadProductThumbnail(String productId, MultipartFile file) {
+        log.info("Uploading thumbnail for product: {}", productId);
+
+        Product product = productRepository.findById(UUID.fromString(productId))
+                .orElseThrow(() -> new ResourceNotFoundException("Product not found"));
+
+        ImageProcessingService.ValidationResult validation = imageProcessingService.validateImage(file, "product_thumbnail");
+        if (!validation.isValid()) {
+            throw new BusinessException("Invalid thumbnail image: " + validation.getErrorMessage());
+        }
+
+        if (product.getThumbnailObjectKey() != null) {
+            s3Service.deleteImage(product.getThumbnailObjectKey());
+        }
+
+        ProcessedImageResult processedImage = imageProcessingService.processProductImage(file, true);
+        ImageUploadResult uploadResult = s3Service.uploadProductImage(processedImage, productId, true);
+
+        product.setThumbnailObjectKey(uploadResult.getObjectKey());
+        product.setThumbnailFileSize(uploadResult.getFileSize());
+        product.setThumbnailContentType(uploadResult.getContentType());
+        product.setThumbnailWidth(0);
+        product.setThumbnailHeight(0);
+
+        productRepository.save(product);
+
+        log.info("Thumbnail uploaded successfully for product: {}", productId);
+        return uploadResult.getObjectKey();
+    }
+
+    @Override
+    public List<String> uploadProductImages(String productId, List<MultipartFile> files) {
+        log.info("Uploading {} images for product: {}", files.size(), productId);
+
+        Product product = productRepository.findById(UUID.fromString(productId))
+                .orElseThrow(() -> new ResourceNotFoundException("Product not found"));
+
+        if (files.size() > 5) {
+            throw new BusinessException("Maximum 5 catalog images allowed per product");
+        }
+
+        List<ProcessedImageResult> processedImages = new ArrayList<>();
+        for (MultipartFile file : files) {
+            ImageProcessingService.ValidationResult validation = imageProcessingService.validateImage(file, "product_image");
+            if (!validation.isValid()) {
+                throw new BusinessException("Invalid image: " + validation.getErrorMessage());
+            }
+            processedImages.add(imageProcessingService.processProductImage(file, false));
+        }
+
+        List<ImageUploadResult> uploadResults = s3Service.uploadProductImages(processedImages, productId);
+
+        List<ProductImage> productImages = uploadResults.stream()
+                .map(result -> {
+                    ProductImage productImage = new ProductImage();
+                    productImage.setObjectKey(result.getObjectKey());
+                    productImage.setFileSize(result.getFileSize());
+                    productImage.setContentType(result.getContentType());
+                    productImage.setWidth(0);
+                    productImage.setHeight(0);
+                    productImage.setProduct(product);
+                    return productImage;
+                })
+                .collect(Collectors.toList());
+
+        productImageRepository.saveAll(productImages);
+
+        List<String> objectKeys = uploadResults.stream()
+                .map(ImageUploadResult::getObjectKey)
+                .collect(Collectors.toList());
+
+        log.info("Successfully uploaded {} images for product: {}", objectKeys.size(), productId);
+        return objectKeys;
+    }
+
+    @Override
+    public void deleteProductImage(String productId, String imageId) {
+        ProductImage productImage = productImageRepository.findByIdAndProductId(
+                        UUID.fromString(imageId), UUID.fromString(productId))
+                .orElseThrow(() -> new ResourceNotFoundException("Product image not found"));
+
+        s3Service.deleteImage(productImage.getObjectKey());
+        productImageRepository.delete(productImage);
+
+        log.info("Product image deleted successfully: {}", imageId);
+    }
+
+    @Override
+    public void deleteProductImageByObjectKey(String productId, String objectKey) {
+        Product product = productRepository.findById(UUID.fromString(productId))
+                .orElseThrow(() -> new ResourceNotFoundException("Product not found"));
+
+        if (objectKey.equals(product.getThumbnailObjectKey())) {
+            s3Service.deleteImage(objectKey);
+
+            product.setThumbnailObjectKey(null);
+            product.setThumbnailFileSize(null);
+            product.setThumbnailContentType(null);
+            product.setThumbnailWidth(null);
+            product.setThumbnailHeight(null);
+
+            if (product.hasVariants()) {
+                clearThumbnailFromVariants(product, objectKey);
+            }
+
+            productRepository.save(product);
+            log.info("Product thumbnail deleted and cleared from variants for product: {}", productId);
+            return;
+        }
+
+        ProductImage productImage = productImageRepository
+                .findByObjectKeyAndProductId(objectKey, UUID.fromString(productId))
+                .orElseThrow(() -> new ResourceNotFoundException("Product image not found"));
+
+        s3Service.deleteImage(objectKey);
+        productImageRepository.delete(productImage);
+
+        if (product.hasVariants()) {
+            removeImageFromVariants(product, objectKey);
+        }
+
+        log.info("Product catalog image deleted and cleared from variants: {}", objectKey);
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public PresignedUrlResponse getProductImageUrl(String objectKey) {
+        if (!s3Service.imageExists(objectKey)) {
+            throw new ResourceNotFoundException("Image not found: " + objectKey);
+        }
+        return s3Service.generateReadPresignedUrl(objectKey, 60);
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public ProductStatsResponse getProductStats() {
+        long totalProducts = productRepository.count();
+        long activeProducts = productRepository.countByIsActiveTrue();
+        long featuredProducts = productRepository.countByIsFeaturedTrue();
+        long productsWithVariants = productRepository.countByVariantType(VariantType.PARENT);
+
+        BigDecimal averagePrice = productRepository.findAveragePrice();
+        BigDecimal totalInventoryValue = productRepository.findTotalInventoryValue();
+
+        return ProductStatsResponse.builder()
+                .totalProducts(totalProducts)
+                .activeProducts(activeProducts)
+                .featuredProducts(featuredProducts)
+                .productsWithVariants(productsWithVariants)
+                .averagePrice(averagePrice)
+                .totalInventoryValue(totalInventoryValue)
+                .build();
+    }
+
+    private String generateUniqueSku(Brand brand, Product parentProduct, String productName) {
+        String baseSku;
+
+        if (parentProduct != null) {
+            String parentBaseSku = extractBaseSku(parentProduct.getSku());
+            baseSku = parentBaseSku + "-V";
+        } else {
+            String categoryCode = brand.getCategory() != null ?
+                    cleanAndTruncate(brand.getCategory().getName()).toUpperCase() : "GEN";
+            String brandCode = cleanAndTruncate(brand.getName()).toUpperCase();
+            String productCode = cleanAndTruncate(productName).toUpperCase();
+            baseSku = String.format("SSEW-%s-%s-%s", categoryCode, brandCode, productCode);
+        }
+
+        String uniqueSku;
+        int attempts = 0;
+        do {
+            String suffix = generateRandomSuffix();
+            uniqueSku = baseSku + "-" + suffix;
+            attempts++;
+            if (attempts > 10) {
+                uniqueSku = baseSku + "-" + System.currentTimeMillis();
+                break;
+            }
+        } while (productRepository.existsBySku(uniqueSku));
+
+        return uniqueSku;
+    }
+
+    private String extractBaseSku(String sku) {
+        int lastDashIndex = sku.lastIndexOf("-");
+        return lastDashIndex > 0 ? sku.substring(0, lastDashIndex) : sku;
+    }
+
+    private String generateRandomSuffix() {
+        return String.format("%04X", ThreadLocalRandom.current().nextInt(0x10000));
+    }
+
+    private String cleanAndTruncate(String input) {
+        if (input == null) return "UNK";
+        String cleaned = input.replaceAll("[^a-zA-Z0-9]", "").toUpperCase();
+        return cleaned.length() > 3 ? cleaned.substring(0, 3) : cleaned;
+    }
+
+    private String generateUniqueSlug(String name) {
+        String baseSlug = slugGenerator.generateSlug(name);
+        String uniqueSlug = baseSlug;
+        int counter = 1;
+
+        while (productRepository.existsBySlug(uniqueSlug)) {
+            uniqueSlug = baseSlug + "-" + counter++;
+        }
+
+        return uniqueSlug;
+    }
+
+    private void inheritParentImages(Product parentProduct, Product variant) {
+        log.info("Inheriting images from parent {} to variant {}",
+                parentProduct.getId(), variant.getId());
+
+        if (parentProduct.getThumbnailObjectKey() != null &&
+            s3Service.imageExists(parentProduct.getThumbnailObjectKey())) {
+
+            variant.setThumbnailObjectKey(parentProduct.getThumbnailObjectKey());
+            variant.setThumbnailFileSize(parentProduct.getThumbnailFileSize());
+            variant.setThumbnailContentType(parentProduct.getThumbnailContentType());
+            variant.setThumbnailWidth(parentProduct.getThumbnailWidth());
+            variant.setThumbnailHeight(parentProduct.getThumbnailHeight());
+            log.info("Inherited thumbnail: {}", parentProduct.getThumbnailObjectKey());
+        }
+
+        List<ProductImage> parentImages = productImageRepository
+                .findByProductIdOrderByDisplayOrderAsc(parentProduct.getId());
+
+        if (!parentImages.isEmpty()) {
+            List<ProductImage> variantImages = parentImages.stream()
+                    .filter(img -> s3Service.imageExists(img.getObjectKey())) // Validate S3 existence
+                    .map(parentImage -> {
+                        ProductImage variantImage = new ProductImage();
+                        variantImage.setObjectKey(parentImage.getObjectKey());
+                        variantImage.setFileSize(parentImage.getFileSize());
+                        variantImage.setContentType(parentImage.getContentType());
+                        variantImage.setWidth(parentImage.getWidth());
+                        variantImage.setHeight(parentImage.getHeight());
+                        variantImage.setAltText(parentImage.getAltText());
+                        variantImage.setDisplayOrder(parentImage.getDisplayOrder());
+                        variantImage.setIsPrimary(parentImage.getIsPrimary());
+                        variantImage.setProduct(variant);
+                        return variantImage;
+                    })
+                    .collect(Collectors.toList());
+
+            if (!variantImages.isEmpty()) {
+                productImageRepository.saveAll(variantImages);
+                log.info("Inherited {} catalog images for variant {}",
+                        variantImages.size(), variant.getId());
+            }
+        }
+    }
+
+    private void validateProductData(CreateProductRequest request, Product existingProduct) {
+        if (request.getName() != null && (existingProduct == null || !request.getName().equals(existingProduct.getName()))) {
+            if (productRepository.existsByName(request.getName())) {
+                throw new BusinessException("Product with this name already exists");
+            }
+        }
+
+        if (request.getModelNumber() != null && (existingProduct == null || !request.getModelNumber().equals(existingProduct.getModelNumber()))) {
+            if (productRepository.existsByModelNumber(request.getModelNumber())) {
+                throw new BusinessException("Product with this model number already exists");
+            }
+        }
+    }
+
+    private void validateProductUpdateData(UpdateProductRequest request, Product existingProduct) {
+        if (request.getName() != null && !request.getName().equals(existingProduct.getName())) {
+            if (productRepository.existsByName(request.getName())) {
+                throw new BusinessException("Product with this name already exists");
+            }
+        }
+
+        if (request.getModelNumber() != null && !request.getModelNumber().equals(existingProduct.getModelNumber())) {
+            if (productRepository.existsByModelNumber(request.getModelNumber())) {
+                throw new BusinessException("Product with this model number already exists");
+            }
+        }
+    }
+
+    private void deleteProductImages(Product product) {
+        List<String> objectKeys = new ArrayList<>();
+
+        if (product.getThumbnailObjectKey() != null) {
+            objectKeys.add(product.getThumbnailObjectKey());
+        }
+
+        objectKeys.addAll(product.getProductImages().stream()
+                .map(ProductImage::getObjectKey)
+                .toList());
+
+        if (!objectKeys.isEmpty()) {
+            s3Service.deleteImages(objectKeys);
+        }
+    }
+
+    private Specification<Product> buildProductSpecification(ProductSearchFilters filters) {
+        return (root, query, criteriaBuilder) -> {
+            List<jakarta.persistence.criteria.Predicate> predicates = new ArrayList<>();
+
+            if (filters.getKeyword() != null && !filters.getKeyword().trim().isEmpty()) {
+                String keyword = "%" + filters.getKeyword().toLowerCase() + "%";
+                jakarta.persistence.criteria.Predicate namePredicate = criteriaBuilder.like(
+                        criteriaBuilder.lower(root.get("name")), keyword);
+                jakarta.persistence.criteria.Predicate descriptionPredicate = criteriaBuilder.like(
+                        criteriaBuilder.lower(root.get("description")), keyword);
+                jakarta.persistence.criteria.Predicate skuPredicate = criteriaBuilder.like(
+                        criteriaBuilder.lower(root.get("sku")), keyword);
+
+                predicates.add(criteriaBuilder.or(namePredicate, descriptionPredicate, skuPredicate));
+            }
+
+            if (filters.getCategoryId() != null) {
+                predicates.add(criteriaBuilder.equal(
+                        root.get("brand").get("category").get("id"), UUID.fromString(filters.getCategoryId())));
+            }
+
+            if (filters.getBrandId() != null) {
+                predicates.add(criteriaBuilder.equal(
+                        root.get("brand").get("id"), UUID.fromString(filters.getBrandId())));
+            }
+
+            if (filters.getMinPrice() != null) {
+                predicates.add(criteriaBuilder.greaterThanOrEqualTo(root.get("price"), filters.getMinPrice()));
+            }
+
+            if (filters.getMaxPrice() != null) {
+                predicates.add(criteriaBuilder.lessThanOrEqualTo(root.get("price"), filters.getMaxPrice()));
+            }
+
+            if (filters.getIsFeatured() != null) {
+                predicates.add(criteriaBuilder.equal(root.get("isFeatured"), filters.getIsFeatured()));
+            }
+
+            predicates.add(criteriaBuilder.isTrue(root.get("isActive")));
+
+            return criteriaBuilder.and(predicates.toArray(new jakarta.persistence.criteria.Predicate[0]));
+        };
+    }
+
+    private Specification<Product> buildProductSpecificationExcludingVariants(ProductSearchFilters filters) {
+        return (root, query, criteriaBuilder) -> {
+            List<jakarta.persistence.criteria.Predicate> predicates = new ArrayList<>();
+
+            // Exclude VARIANT products - only show PARENT and STANDALONE
+            predicates.add(criteriaBuilder.notEqual(root.get("variantType"), VariantType.VARIANT));
+
+            if (filters.getKeyword() != null && !filters.getKeyword().trim().isEmpty()) {
+                String keyword = "%" + filters.getKeyword().toLowerCase() + "%";
+                jakarta.persistence.criteria.Predicate namePredicate = criteriaBuilder.like(
+                        criteriaBuilder.lower(root.get("name")), keyword);
+                jakarta.persistence.criteria.Predicate descriptionPredicate = criteriaBuilder.like(
+                        criteriaBuilder.lower(root.get("description")), keyword);
+                jakarta.persistence.criteria.Predicate skuPredicate = criteriaBuilder.like(
+                        criteriaBuilder.lower(root.get("sku")), keyword);
+
+                predicates.add(criteriaBuilder.or(namePredicate, descriptionPredicate, skuPredicate));
+            }
+
+            if (filters.getCategoryId() != null) {
+                predicates.add(criteriaBuilder.equal(
+                        root.get("brand").get("category").get("id"), UUID.fromString(filters.getCategoryId())));
+            }
+
+            if (filters.getBrandId() != null) {
+                predicates.add(criteriaBuilder.equal(
+                        root.get("brand").get("id"), UUID.fromString(filters.getBrandId())));
+            }
+
+            if (filters.getMinPrice() != null) {
+                predicates.add(criteriaBuilder.greaterThanOrEqualTo(root.get("price"), filters.getMinPrice()));
+            }
+
+            if (filters.getMaxPrice() != null) {
+                predicates.add(criteriaBuilder.lessThanOrEqualTo(root.get("price"), filters.getMaxPrice()));
+            }
+
+            if (filters.getIsFeatured() != null) {
+                predicates.add(criteriaBuilder.equal(root.get("isFeatured"), filters.getIsFeatured()));
+            }
+
+            predicates.add(criteriaBuilder.isTrue(root.get("isActive")));
+
+            return criteriaBuilder.and(predicates.toArray(new jakarta.persistence.criteria.Predicate[0]));
+        };
+    }
+
+    private void mapCreateRequestToProduct(CreateProductRequest request, Product product, Brand brand, Product parentProduct) {
+        product.setName(request.getName());
+        product.setModelNumber(request.getModelNumber());
+        product.setDescription(request.getDescription());
+        product.setShortDescription(request.getShortDescription());
+        product.setSpecifications(specificationSanitizer.sanitizeSpecifications(request.getSpecifications()));
+        product.setPrice(request.getPrice());
+        product.setCompareAtPrice(request.getCompareAtPrice());
+        product.setCostPrice(request.getCostPrice());
+        product.setIsFeatured(request.getIsFeatured());
+        product.setDisplayOrder(request.getDisplayOrder());
+        product.setMetaTitle(request.getMetaTitle());
+        product.setMetaDescription(request.getMetaDescription());
+        product.setMetaKeywords(request.getMetaKeywords());
+        product.setSearchTags(request.getSearchTags());
+        product.setBrand(brand);
+        product.setParentProduct(parentProduct);
+
+        if (parentProduct != null) {
+            product.setVariantType(VariantType.VARIANT);
+        } else {
+            product.setVariantType(VariantType.STANDALONE);
+        }
+    }
+
+    private void mapVariantRequestToProduct(CreateVariantRequest request, Product variant, Brand brand) {
+        variant.setName(request.getName());
+        variant.setModelNumber(request.getModelNumber());
+        variant.setDescription(request.getDescription());
+        variant.setShortDescription(request.getShortDescription());
+        variant.setSpecifications(specificationSanitizer.sanitizeSpecifications(request.getSpecifications()));
+        variant.setPrice(request.getPrice());
+        variant.setCompareAtPrice(request.getCompareAtPrice());
+        variant.setCostPrice(request.getCostPrice());
+        variant.setMetaTitle(request.getMetaTitle());
+        variant.setMetaDescription(request.getMetaDescription());
+        variant.setMetaKeywords(request.getMetaKeywords());
+        variant.setSearchTags(request.getSearchTags());
+        variant.setBrand(brand);
+        variant.setVariantType(VariantType.VARIANT);
+    }
+
+    private void mapUpdateRequestToProduct(UpdateProductRequest request, Product product) {
+        if (request.getName() != null) product.setName(request.getName());
+        if (request.getModelNumber() != null) product.setModelNumber(request.getModelNumber());
+        if (request.getDescription() != null) product.setDescription(request.getDescription());
+        if (request.getShortDescription() != null) product.setShortDescription(request.getShortDescription());
+        if (request.getSpecifications() != null)
+            product.setSpecifications(specificationSanitizer.sanitizeSpecifications(request.getSpecifications()));
+        if (request.getPrice() != null) product.setPrice(request.getPrice());
+        if (request.getCompareAtPrice() != null) product.setCompareAtPrice(request.getCompareAtPrice());
+        if (request.getCostPrice() != null) product.setCostPrice(request.getCostPrice());
+        if (request.getIsActive() != null) product.setIsActive(request.getIsActive());
+        if (request.getIsFeatured() != null) product.setIsFeatured(request.getIsFeatured());
+        if (request.getDisplayOrder() != null) product.setDisplayOrder(request.getDisplayOrder());
+        if (request.getMetaTitle() != null) product.setMetaTitle(request.getMetaTitle());
+        if (request.getMetaDescription() != null) product.setMetaDescription(request.getMetaDescription());
+        if (request.getMetaKeywords() != null) product.setMetaKeywords(request.getMetaKeywords());
+        if (request.getSearchTags() != null) product.setSearchTags(request.getSearchTags());
+    }
+
+    private ProductResponse mapProductToResponse(Product product, boolean includeVariants) {
+        ProductResponse.ProductResponseBuilder builder = ProductResponse.builder()
                 .productId(product.getId().toString())
                 .name(product.getName())
                 .slug(product.getSlug())
                 .sku(product.getSku())
+                .modelNumber(product.getModelNumber())
                 .description(product.getDescription())
                 .shortDescription(product.getShortDescription())
+                .specifications(product.getSpecifications())
                 .price(product.getPrice())
-                .comparePrice(product.getComparePrice())
+                .compareAtPrice(product.getCompareAtPrice())
                 .costPrice(product.getCostPrice())
-                .weight(product.getWeight())
-                .dimensions(product.getDimensions())
-                .stockQuantity(product.getStockQuantity())
-                .minStockLevel(product.getMinStockLevel())
-                .trackInventory(product.getTrackInventory())
-                .status(product.getStatus())
+                .isActive(product.getIsActive())
                 .isFeatured(product.getIsFeatured())
+                .displayOrder(product.getDisplayOrder())
                 .metaTitle(product.getMetaTitle())
                 .metaDescription(product.getMetaDescription())
-                .tags(product.getTags())
-                .createdAt(product.getCreatedAt().toString())
-                .updatedAt(product.getUpdatedAt().toString())
+                .metaKeywords(product.getMetaKeywords())
+                .searchTags(product.getSearchTags())
+                .variantType(product.getVariantType().name())
+                .variantPosition(product.getVariantPosition())
+                .createdAt(product.getCreatedAt() != null
+                        ? product.getCreatedAt().format(DateTimeFormatter.ISO_LOCAL_DATE_TIME) : null)
+                .updatedAt(product.getUpdatedAt() != null
+                        ? product.getUpdatedAt().format(DateTimeFormatter.ISO_LOCAL_DATE_TIME) : null)
                 .brandId(product.getBrand().getId().toString())
-                .brandName(product.getBrand().getName())
-                .categoryId(product.getBrand().getCategory().getId().toString())
-                .categoryName(product.getBrand().getCategory().getName())
-                .imageCount(imageCount)
-                .thumbnailImage(thumbnailImage)
-                .catalogImages(catalogImages)
-                .isInStock(product.isInStock())
-                .isLowStock(product.isLowStock())
-                .specifications(product.getSpecifications() != null ? new HashMap<>(product.getSpecifications()) : new HashMap<>())
-                .build();
+                .brandName(product.getBrandName())
+                .categoryId(product.getCategoryId())
+                .categoryName(product.getCategoryName())
+                .parentProductId(product.getParentProduct() != null ? product.getParentProduct().getId().toString() : null);
+
+        if (product.getThumbnailObjectKey() != null &&
+            s3Service.imageExists(product.getThumbnailObjectKey())) {
+            PresignedUrlResponse thumbnailUrl = s3Service.generateReadPresignedUrl(product.getThumbnailObjectKey(), 60);
+            builder.thumbnailInfo(ThumbnailInfo.builder()
+                    .objectKey(product.getThumbnailObjectKey())
+                    .accessUrl(thumbnailUrl.getPresignedUrl())
+                    .fileSize(product.getThumbnailFileSize())
+                    .contentType(product.getThumbnailContentType())
+                    .width(product.getThumbnailWidth())
+                    .height(product.getThumbnailHeight())
+                    .build());
+        }
+
+        List<ProductImageInfo> imageInfos = product.getProductImages().stream()
+                .map(this::mapProductImageToInfo)
+                .filter(Objects::nonNull)
+                .collect(Collectors.toList());
+        builder.catalogImages(imageInfos);
+
+        if (includeVariants && product.hasVariants()) {
+            List<ProductVariantInfo> variants = product.getVariants().stream()
+                    .map(this::mapProductToVariantInfo)
+                    .collect(Collectors.toList());
+            builder.variants(variants);
+            builder.totalVariants((long) variants.size());
+        } else {
+            builder.totalVariants(0L);
+        }
+
+        return builder.build();
     }
 
-    private ImageInfo buildImageInfo(ProductImage productImage) {
-        return ImageInfo.builder()
+    private ProductSummary mapProductToSummary(Product product) {
+        ProductSummary.ProductSummaryBuilder builder = ProductSummary.builder()
+                .productId(product.getId().toString())
+                .name(product.getName())
+                .slug(product.getSlug())
+                .sku(product.getSku())
+                .modelNumber(product.getModelNumber())
+                .shortDescription(product.getShortDescription())
+                .price(product.getPrice())
+                .compareAtPrice(product.getCompareAtPrice())
+                .isActive(product.getIsActive())
+                .isFeatured(product.getIsFeatured())
+                .variantType(product.getVariantType().name())
+                .brandName(product.getBrandName())
+                .categoryName(product.getCategoryName())
+                .totalVariants((long) product.getVariants().size())
+                .createdAt(product.getCreatedAt().format(DateTimeFormatter.ISO_LOCAL_DATE_TIME));
+
+        if (product.getThumbnailObjectKey() != null) {
+            PresignedUrlResponse thumbnailUrl = s3Service.generateReadPresignedUrl(product.getThumbnailObjectKey(), 60);
+            builder.thumbnailInfo(ThumbnailInfo.builder()
+                    .objectKey(product.getThumbnailObjectKey())
+                    .accessUrl(thumbnailUrl.getPresignedUrl())
+                    .fileSize(product.getThumbnailFileSize())
+                    .contentType(product.getThumbnailContentType())
+                    .width(product.getThumbnailWidth())
+                    .height(product.getThumbnailHeight())
+                    .build());
+        }
+
+        return builder.build();
+    }
+
+    private ProductVariantInfo mapProductToVariantInfo(Product variant) {
+        ProductVariantInfo.ProductVariantInfoBuilder builder = ProductVariantInfo.builder()
+                .variantId(variant.getId().toString())
+                .name(variant.getName())
+                .slug(variant.getSlug())
+                .sku(variant.getSku())
+                .modelNumber(variant.getModelNumber())
+                .price(variant.getPrice())
+                .compareAtPrice(variant.getCompareAtPrice())
+                .isActive(variant.getIsActive())
+                .variantPosition(variant.getVariantPosition())
+                .specifications(variant.getSpecifications());
+
+        if (variant.getThumbnailObjectKey() != null) {
+            PresignedUrlResponse thumbnailUrl = s3Service.generateReadPresignedUrl(variant.getThumbnailObjectKey(), 60);
+            builder.thumbnailInfo(ThumbnailInfo.builder()
+                    .objectKey(variant.getThumbnailObjectKey())
+                    .accessUrl(thumbnailUrl.getPresignedUrl())
+                    .fileSize(variant.getThumbnailFileSize())
+                    .contentType(variant.getThumbnailContentType())
+                    .width(variant.getThumbnailWidth())
+                    .height(variant.getThumbnailHeight())
+                    .build());
+        }
+
+        List<ProductImageInfo> imageInfos = variant.getProductImages().stream()
+                .map(this::mapProductImageToInfo)
+                .collect(Collectors.toList());
+        builder.images(imageInfos);
+
+        return builder.build();
+    }
+
+    private ProductImageInfo mapProductImageToInfo(ProductImage productImage) {
+        if (!s3Service.imageExists(productImage.getObjectKey())) {
+            log.warn("Image not found in S3, skipping: {}", productImage.getObjectKey());
+            return null;
+        }
+
+        PresignedUrlResponse imageUrl = s3Service.generateReadPresignedUrl(productImage.getObjectKey(), 60);
+        return ProductImageInfo.builder()
                 .imageId(productImage.getId().toString())
-                .objectKey(productImage.getImageUrl())
-                .accessUrl(s3Service.generateReadPresignedUrl(productImage.getImageUrl(), 60).getPresignedUrl())
-                .altText(productImage.getAltText())
-                .displayOrder(productImage.getDisplayOrder())
+                .objectKey(productImage.getObjectKey())
+                .accessUrl(imageUrl.getPresignedUrl())
                 .fileSize(productImage.getFileSize())
-                .fileFormat(productImage.getOriginalFileFormat())
+                .contentType(productImage.getContentType())
                 .width(productImage.getWidth())
                 .height(productImage.getHeight())
+                .altText(productImage.getAltText())
+                .displayOrder(productImage.getDisplayOrder())
+                .isPrimary(productImage.getIsPrimary())
                 .build();
     }
 
-    private Product findProductById(String productId) {
-        try {
-            UUID productUuid = UUID.fromString(productId);
-            Optional<Product> productOptional = productRepository.findById(productUuid);
-
-            if (productOptional.isEmpty()) {
-                throw new ResponseStatusException(HttpStatus.NOT_FOUND, "Product not found with ID: " + productId);
+    private void clearThumbnailFromVariants(Product parentProduct, String objectKey) {
+        List<Product> variants = parentProduct.getVariants();
+        for (Product variant : variants) {
+            if (objectKey.equals(variant.getThumbnailObjectKey())) {
+                variant.setThumbnailObjectKey(null);
+                variant.setThumbnailFileSize(null);
+                variant.setThumbnailContentType(null);
+                variant.setThumbnailWidth(null);
+                variant.setThumbnailHeight(null);
             }
+        }
+        productRepository.saveAll(variants);
+    }
 
-            return productOptional.get();
-        } catch (IllegalArgumentException e) {
-            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Invalid product ID format");
+    private void removeImageFromVariants(Product parentProduct, String objectKey) {
+        List<Product> variants = parentProduct.getVariants();
+        for (Product variant : variants) {
+            Optional<ProductImage> variantImage = productImageRepository
+                    .findByObjectKeyAndProductId(objectKey, variant.getId());
+            variantImage.ifPresent(productImageRepository::delete);
         }
     }
 
-    private void updateProductFields(Product product, UpdateProductRequest request) {
-        boolean updated = false;
 
-        if (StringUtils.hasText(request.getName()) && !request.getName().equals(product.getName())) {
-            product.setName(request.getName().trim());
+    @Scheduled(cron = "0 0 2 * * ?")
+    public void cleanupOrphanedImageReferences() {
+        log.info("Starting cleanup of orphaned image references");
 
-            String newSlug = generateSlug(request.getName());
-            if (!newSlug.equals(product.getSlug())) {
-                validateUniqueSlugForUpdate(newSlug, product.getId());
-                product.setSlug(newSlug);
+        List<Product> productsWithThumbnails = productRepository.findProductsWithThumbnails();
+        for (Product product : productsWithThumbnails) {
+            if (!s3Service.imageExists(product.getThumbnailObjectKey())) {
+                log.info("Cleaning orphaned thumbnail for product: {}", product.getId());
+                product.setThumbnailObjectKey(null);
+                product.setThumbnailFileSize(null);
+                product.setThumbnailContentType(null);
+                product.setThumbnailWidth(null);
+                product.setThumbnailHeight(null);
             }
-            updated = true;
+        }
+        productRepository.saveAll(productsWithThumbnails);
+
+        List<ProductImage> allImages = productImageRepository.findAll();
+        List<ProductImage> orphanedImages = allImages.stream()
+                .filter(img -> !s3Service.imageExists(img.getObjectKey()))
+                .collect(Collectors.toList());
+
+        if (!orphanedImages.isEmpty()) {
+            log.info("Cleaning {} orphaned catalog images", orphanedImages.size());
+            productImageRepository.deleteAll(orphanedImages);
         }
 
-        if (request.getDescription() != null) {
-            product.setDescription(StringUtils.hasText(request.getDescription()) ? request.getDescription().trim() : null);
-            updated = true;
-        }
-
-        if (request.getShortDescription() != null) {
-            product.setShortDescription(StringUtils.hasText(request.getShortDescription()) ? request.getShortDescription().trim() : null);
-            updated = true;
-        }
-
-        if (request.getPrice() != null && !request.getPrice().equals(product.getPrice())) {
-            if (request.getComparePrice() != null && request.getPrice().compareTo(request.getComparePrice()) > 0) {
-                throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Price cannot be greater than compare price");
-            }
-            product.setPrice(request.getPrice());
-            updated = true;
-        }
-
-        if (request.getComparePrice() != null) {
-            if (request.getComparePrice().compareTo(product.getPrice()) < 0) {
-                throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Compare price cannot be less than current price");
-            }
-            product.setComparePrice(request.getComparePrice());
-            updated = true;
-        }
-
-        if (request.getCostPrice() != null) {
-            product.setCostPrice(request.getCostPrice());
-            updated = true;
-        }
-
-        if (request.getWeight() != null) {
-            product.setWeight(request.getWeight());
-            updated = true;
-        }
-
-        if (request.getDimensions() != null) {
-            product.setDimensions(StringUtils.hasText(request.getDimensions()) ? request.getDimensions().trim() : null);
-            updated = true;
-        }
-
-        if (request.getStockQuantity() != null && !request.getStockQuantity().equals(product.getStockQuantity())) {
-            product.setStockQuantity(request.getStockQuantity());
-            updated = true;
-        }
-
-        if (request.getMinStockLevel() != null && !request.getMinStockLevel().equals(product.getMinStockLevel())) {
-            product.setMinStockLevel(request.getMinStockLevel());
-            updated = true;
-        }
-
-        if (request.getTrackInventory() != null && !request.getTrackInventory().equals(product.getTrackInventory())) {
-            product.setTrackInventory(request.getTrackInventory());
-            updated = true;
-        }
-
-        if (request.getStatus() != null && !request.getStatus().equals(product.getStatus())) {
-            product.setStatus(request.getStatus());
-            updated = true;
-        }
-
-        if (request.getIsFeatured() != null && !request.getIsFeatured().equals(product.getIsFeatured())) {
-            product.setIsFeatured(request.getIsFeatured());
-            updated = true;
-        }
-
-        if (request.getMetaTitle() != null) {
-            product.setMetaTitle(StringUtils.hasText(request.getMetaTitle()) ? request.getMetaTitle().trim() : null);
-            updated = true;
-        }
-
-        if (request.getMetaDescription() != null) {
-            product.setMetaDescription(StringUtils.hasText(request.getMetaDescription()) ? request.getMetaDescription().trim() : null);
-            updated = true;
-        }
-
-        if (request.getTags() != null) {
-            product.setTags(StringUtils.hasText(request.getTags()) ? request.getTags().trim() : null);
-            updated = true;
-        }
-
-        if (StringUtils.hasText(request.getBrandId()) &&
-            !request.getBrandId().equals(product.getBrand().getId().toString())) {
-            Brand newBrand = findBrandById(request.getBrandId());
-            product.setBrand(newBrand);
-            updated = true;
-        }
-
-        if (request.getSpecifications() != null) {
-            Map<String, String> sanitizedSpecs = specificationSanitizer.sanitizeSpecifications(request.getSpecifications());
-            product.setSpecifications(sanitizedSpecs);
-            updated = true;
-        }
-
-        if (updated) {
-            product.setUpdatedAt(LocalDateTime.now());
-        }
-    }
-
-    private void validateUniqueSlugForUpdate(String slug, UUID productId) {
-        if (productRepository.existsBySlugAndIdNot(slug, productId)) {
-            throw new ResponseStatusException(HttpStatus.CONFLICT, "Product with this slug already exists");
-        }
+        log.info("Completed cleanup of orphaned image references");
     }
 }
