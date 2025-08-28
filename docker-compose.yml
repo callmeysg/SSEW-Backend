@@ -1,0 +1,63 @@
+version: '3.8'
+
+services:
+  postgres:
+    image: postgres:15-alpine
+    container_name: ssew-postgres
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-ssew}
+      POSTGRES_USER: ${POSTGRES_USER:-ssew_owner}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-ssew_password}
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    networks:
+      - ssew-network
+    restart: unless-stopped
+
+  redis:
+    image: redis:7-alpine
+    container_name: ssew-redis
+    command: redis-server --requirepass ${REDIS_PASSWORD:-redis_password}
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    networks:
+      - ssew-network
+    restart: unless-stopped
+
+  app:
+    image: singhtwenty2/ssew-core-service:${IMAGE_TAG:-latest}
+    container_name: ssew-app
+    ports:
+      - "9000:9000"
+    environment:
+      SPRING_PROFILES_ACTIVE: staging
+      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/${POSTGRES_DB:-ssew}
+      SPRING_DATASOURCE_USERNAME: ${POSTGRES_USER:-ssew_owner}
+      SPRING_DATASOURCE_PASSWORD: ${POSTGRES_PASSWORD:-ssew_password}
+      SPRING_DATA_REDIS_URL: redis://:${REDIS_PASSWORD:-redis_password}@redis:6379
+      AWS_REGION: ${AWS_REGION:-ap-south-1}
+      AWS_S3_TEMP_BUCKET: ${AWS_S3_TEMP_BUCKET:-ssew-bucket-staging}
+      AWS_S3_TEMP_FOLDER: ${AWS_S3_TEMP_FOLDER:-temp}
+      AWS_S3_PERMANENT_FOLDER: ${AWS_S3_PERMANENT_FOLDER:-permanent}
+      AWS_ACCESS_KEY_ID: ${AWS_ACCESS_KEY_ID}
+      AWS_SECRET_ACCESS_KEY: ${AWS_SECRET_ACCESS_KEY}
+      JWT_SECRET: ${JWT_SECRET}
+      APP_SECURITY_DEVELOPER_SECRET: ${APP_DEVELOPER_SECRET}
+    depends_on:
+      - postgres
+      - redis
+    networks:
+      - ssew-network
+    restart: unless-stopped
+
+volumes:
+  postgres_data:
+  redis_data:
+
+networks:
+  ssew-network:
+    driver: bridge
