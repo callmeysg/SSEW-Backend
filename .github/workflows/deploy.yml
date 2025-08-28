@@ -64,10 +64,8 @@ jobs:
             mkdir -p /home/ubuntu/ssew-deployment
             cd /home/ubuntu/ssew-deployment
             
-            # Download docker-compose.yml if it doesn't exist
-            if [ ! -f docker-compose.yml ]; then
-              curl -o docker-compose.yml https://raw.githubusercontent.com/${{ github.repository }}/main/docker-compose.yml
-            fi
+            # Download latest docker-compose.yml
+            curl -o docker-compose.yml https://raw.githubusercontent.com/${{ github.repository }}/main/docker-compose.yml
             
             # Set environment variables
             export IMAGE_TAG=staging-${{ steps.build-number.outputs.BUILD_NUMBER }}
@@ -84,21 +82,37 @@ jobs:
             export AWS_S3_TEMP_FOLDER="temp"
             export AWS_S3_PERMANENT_FOLDER="permanent"
             
-            # Start database services if not running
-            docker-compose up -d postgres redis
-            
-            # Wait a moment for databases to be ready
-            sleep 10
-            
-            # Pull and deploy the application
-            docker-compose pull app
-            docker-compose up -d app
-            
-            # Show running containers
-            echo "Currently running containers:"
-            docker ps
+            # Stop existing containers
+            docker-compose down
             
             # Clean up old images
             docker image prune -f
             
-            echo "Deployment completed successfully!"
+            # Pull latest images
+            docker-compose pull
+            
+            # Start all services (databases will start first due to depends_on with health checks)
+            docker-compose up -d
+            
+            # Wait for services to be healthy
+            echo "Waiting for services to be healthy..."
+            timeout=300
+            while [ $timeout -gt 0 ]; do
+              if docker-compose ps | grep -E "(healthy|Up)" | wc -l | grep -q "3"; then
+                echo "All services are up and healthy!"
+                break
+              fi
+              echo "Waiting for services... ($timeout seconds remaining)"
+              sleep 10
+              timeout=$((timeout-10))
+            done
+            
+            # Show service status
+            echo "Service status:"
+            docker-compose ps
+            
+            # Show application logs (last 50 lines)
+            echo "Application logs:"
+            docker-compose logs --tail=50 app
+            
+            echo "Deployment completed!"

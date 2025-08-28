@@ -15,6 +15,11 @@ services:
     networks:
       - ssew-network
     restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-ssew_owner} -d ${POSTGRES_DB:-ssew}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
 
   redis:
     image: redis:7-alpine
@@ -27,6 +32,11 @@ services:
     networks:
       - ssew-network
     restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "redis-cli", "--raw", "incr", "ping"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
 
   app:
     image: singhtwenty2/ssew-core-service:${IMAGE_TAG:-latest}
@@ -48,11 +58,19 @@ services:
       JWT_SECRET: ${JWT_SECRET}
       APP_SECURITY_DEVELOPER_SECRET: ${APP_DEVELOPER_SECRET}
     depends_on:
-      - postgres
-      - redis
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
     networks:
       - ssew-network
     restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:9000/actuator/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
 
 volumes:
   postgres_data:
