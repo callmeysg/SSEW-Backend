@@ -60,8 +60,16 @@ jobs:
           username: ${{ secrets.EC2_USER }}
           key: ${{ secrets.EC2_SSH_KEY }}
           script: |
+            # Create deployment directory if it doesn't exist
+            mkdir -p /home/ubuntu/ssew-deployment
             cd /home/ubuntu/ssew-deployment
             
+            # Download docker-compose.yml if it doesn't exist
+            if [ ! -f docker-compose.yml ]; then
+              curl -o docker-compose.yml https://raw.githubusercontent.com/${{ github.repository }}/main/docker-compose.yml
+            fi
+            
+            # Set environment variables
             export IMAGE_TAG=staging-${{ steps.build-number.outputs.BUILD_NUMBER }}
             export AWS_ACCESS_KEY_ID="${{ secrets.AWS_ACCESS_KEY_ID }}"
             export AWS_SECRET_ACCESS_KEY="${{ secrets.AWS_SECRET_ACCESS_KEY }}"
@@ -76,9 +84,21 @@ jobs:
             export AWS_S3_TEMP_FOLDER="temp"
             export AWS_S3_PERMANENT_FOLDER="permanent"
             
-            docker-compose pull app
-            docker-compose up -d --no-deps app
+            # Start database services if not running
+            docker-compose up -d postgres redis
             
+            # Wait a moment for databases to be ready
+            sleep 10
+            
+            # Pull and deploy the application
+            docker-compose pull app
+            docker-compose up -d app
+            
+            # Show running containers
+            echo "Currently running containers:"
+            docker ps
+            
+            # Clean up old images
             docker image prune -f
             
             echo "Deployment completed successfully!"
