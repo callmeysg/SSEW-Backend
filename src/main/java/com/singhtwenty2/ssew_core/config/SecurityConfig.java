@@ -94,11 +94,12 @@ public class SecurityConfig {
         CorsConfiguration configuration = new CorsConfiguration();
 
         configuration.setAllowedOriginPatterns(Arrays.asList(
-                "http://localhost:3000",    // Local development
-                "http://localhost:5173",    // Vite dev server
-                "https://ssew.com",         // Production frontend domain
-                "https://www.ssew.com",     // Production frontend domain with www
-                "https://*.ssew.com"        // Subdomains if needed
+                "http://localhost:3000",
+                "https://ssew-dashboard.pages.dev",
+                "https://srishastabangalore.in",
+                "https://dash.srishastabangalore.in",
+                "https://www.srishastabangalore.in",
+                "https://*.srishastabangalore.com"
         ));
 
         configuration.setAllowedMethods(Arrays.asList(
