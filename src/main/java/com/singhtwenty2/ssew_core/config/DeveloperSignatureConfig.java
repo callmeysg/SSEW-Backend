@@ -25,7 +25,7 @@ public class DeveloperSignatureConfig implements WebMvcConfigurer {
                 @NonNull HttpServletRequest request,
                 HttpServletResponse response,
                 @NonNull Object handler) {
-            response.setHeader("X-Backend-Dev", "Aryan Singh (@singhtwenty2)");
+            response.setHeader("X-Dev-Name", "Aryan Singh (@singhtwenty2)");
             response.setHeader("X-Dev-Portfolio", "https://singhtwenty2.pages.dev/");
             response.setHeader("X-Dev-Alias", "singhtwenty2");
 

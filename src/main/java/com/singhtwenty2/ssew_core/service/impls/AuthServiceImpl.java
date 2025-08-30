@@ -59,8 +59,14 @@ public class AuthServiceImpl implements AuthService {
 
         log.info("User registered successfully with ID: {}", savedUser.getId());
 
+        // AS PER NEW REQUIREMENTS, LET THE USER LOGIN WITHOUT VERIFICATION
+//        return RegisterResponse.builder()
+//                .additionalNotes("Please verify your email and phone number. You can log in only after verification.")
+//                .userMetadata(buildUserMetadata(savedUser))
+//                .build();
+
         return RegisterResponse.builder()
-                .additionalNotes("Please verify your email and phone number. You can log in only after verification.")
+                .additionalNotes("You have been registered successfully. You can log in now.")
                 .userMetadata(buildUserMetadata(savedUser))
                 .build();
     }

@@ -45,6 +45,7 @@ public class SecurityConfig {
                                 "/swagger-ui/**",        // Swagger UI
                                 "/v3/api-docs/**",       // OpenAPI docs
                                 "/favicon.ico",          // Favicon
+                                "/v1/ping",              // Simple ping endpoint
                                 "/error"                 // Error handling
                         ).permitAll()
 

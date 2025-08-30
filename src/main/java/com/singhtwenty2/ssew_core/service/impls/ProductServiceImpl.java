@@ -98,7 +98,7 @@ public class ProductServiceImpl implements ProductService {
                 .orElseThrow(() -> new ResourceNotFoundException("Parent product not found"));
 
         if (parentProduct.getVariantType().equals(VariantType.VARIANT)) {
-            throw new BusinessException("Cannot create variant for a variant product");
+            throw new BusinessException("Cannot create variant for a variant product. Variants can only be created for parent or standalone products.");
         }
 
         Brand brand = parentProduct.getBrand();
@@ -178,20 +178,48 @@ public class ProductServiceImpl implements ProductService {
         Product product = productRepository.findById(UUID.fromString(productId))
                 .orElseThrow(() -> new ResourceNotFoundException("Product not found with ID: " + productId));
 
+        if (product.getVariantType().equals(VariantType.VARIANT)) {
+            throw new BusinessException("Use the variant deletion endpoint to delete variants");
+        }
+
         if (product.hasVariants()) {
             throw new BusinessException("Cannot delete product with variants. Delete variants first.");
         }
 
-        deleteProductImages(product);
+        deleteProductOwnedImages(product);
         productRepository.delete(product);
 
         log.info("Product deleted successfully with ID: {}", productId);
     }
 
     @Override
+    public void deleteVariant(String variantId) {
+        log.info("Deleting variant with ID: {}", variantId);
+
+        Product variant = productRepository.findById(UUID.fromString(variantId))
+                .orElseThrow(() -> new ResourceNotFoundException("Variant not found with ID: " + variantId));
+
+        if (!variant.getVariantType().equals(VariantType.VARIANT)) {
+            throw new BusinessException("Product is not a variant. Use the product deletion endpoint for non-variants.");
+        }
+
+        Product parentProduct = variant.getParentProduct();
+
+        deleteVariantSpecificImages(variant);
+
+        productRepository.delete(variant);
+
+        if (parentProduct != null) {
+            parentProduct.removeVariant(variant);
+            productRepository.save(parentProduct);
+        }
+
+        log.info("Variant deleted successfully with ID: {}", variantId);
+    }
+
+    @Override
     @Transactional(readOnly = true)
     public Page<ProductSummary> getAllProducts(ProductSearchFilters filters, Pageable pageable) {
-        // Modified to return only PARENT and STANDALONE products, not variants
         Specification<Product> spec = buildProductSpecificationExcludingVariants(filters);
         Page<Product> productPage = productRepository.findAll(spec, pageable);
 
@@ -205,7 +233,6 @@ public class ProductServiceImpl implements ProductService {
     @Override
     @Transactional(readOnly = true)
     public Page<ProductSummary> getAllProductsIncludingVariants(ProductSearchFilters filters, Pageable pageable) {
-        // New method that includes variants for admin purposes
         Specification<Product> spec = buildProductSpecification(filters);
         Page<Product> productPage = productRepository.findAll(spec, pageable);
         return productPage.map(this::mapProductToSummary);
@@ -238,7 +265,7 @@ public class ProductServiceImpl implements ProductService {
             throw new BusinessException("Invalid thumbnail image: " + validation.getErrorMessage());
         }
 
-        if (product.getThumbnailObjectKey() != null) {
+        if (product.getThumbnailObjectKey() != null && isImageOwnedByProduct(product.getThumbnailObjectKey(), product)) {
             s3Service.deleteImage(product.getThumbnailObjectKey());
         }
 
@@ -308,7 +335,9 @@ public class ProductServiceImpl implements ProductService {
                         UUID.fromString(imageId), UUID.fromString(productId))
                 .orElseThrow(() -> new ResourceNotFoundException("Product image not found"));
 
-        s3Service.deleteImage(productImage.getObjectKey());
+        if (isImageOwnedByProduct(productImage.getObjectKey(), productImage.getProduct())) {
+            s3Service.deleteImage(productImage.getObjectKey());
+        }
         productImageRepository.delete(productImage);
 
         log.info("Product image deleted successfully: {}", imageId);
@@ -320,7 +349,9 @@ public class ProductServiceImpl implements ProductService {
                 .orElseThrow(() -> new ResourceNotFoundException("Product not found"));
 
         if (objectKey.equals(product.getThumbnailObjectKey())) {
-            s3Service.deleteImage(objectKey);
+            if (isImageOwnedByProduct(objectKey, product)) {
+                s3Service.deleteImage(objectKey);
+            }
 
             product.setThumbnailObjectKey(null);
             product.setThumbnailFileSize(null);
@@ -341,7 +372,9 @@ public class ProductServiceImpl implements ProductService {
                 .findByObjectKeyAndProductId(objectKey, UUID.fromString(productId))
                 .orElseThrow(() -> new ResourceNotFoundException("Product image not found"));
 
-        s3Service.deleteImage(objectKey);
+        if (isImageOwnedByProduct(objectKey, product)) {
+            s3Service.deleteImage(objectKey);
+        }
         productImageRepository.delete(productImage);
 
         if (product.hasVariants()) {
@@ -379,6 +412,56 @@ public class ProductServiceImpl implements ProductService {
                 .averagePrice(averagePrice)
                 .totalInventoryValue(totalInventoryValue)
                 .build();
+    }
+
+    private boolean isImageOwnedByProduct(String objectKey, Product product) {
+        String productIdFromKey = extractProductIdFromObjectKey(objectKey);
+        return productIdFromKey != null && productIdFromKey.equals(product.getId().toString());
+    }
+
+    private String extractProductIdFromObjectKey(String objectKey) {
+        if (objectKey == null || !objectKey.startsWith("products/")) {
+            return null;
+        }
+        String[] parts = objectKey.split("/");
+        if (parts.length >= 2) {
+            return parts[1];
+        }
+        return null;
+    }
+
+    private void deleteProductOwnedImages(Product product) {
+        List<String> objectKeys = new ArrayList<>();
+
+        if (product.getThumbnailObjectKey() != null && isImageOwnedByProduct(product.getThumbnailObjectKey(), product)) {
+            objectKeys.add(product.getThumbnailObjectKey());
+        }
+
+        objectKeys.addAll(product.getProductImages().stream()
+                .map(ProductImage::getObjectKey)
+                .filter(key -> isImageOwnedByProduct(key, product))
+                .toList());
+
+        if (!objectKeys.isEmpty()) {
+            s3Service.deleteImages(objectKeys);
+        }
+    }
+
+    private void deleteVariantSpecificImages(Product variant) {
+        List<String> objectKeysToDelete = new ArrayList<>();
+
+        if (variant.getThumbnailObjectKey() != null && isImageOwnedByProduct(variant.getThumbnailObjectKey(), variant)) {
+            objectKeysToDelete.add(variant.getThumbnailObjectKey());
+        }
+
+        objectKeysToDelete.addAll(variant.getProductImages().stream()
+                .map(ProductImage::getObjectKey)
+                .filter(key -> isImageOwnedByProduct(key, variant))
+                .toList());
+
+        if (!objectKeysToDelete.isEmpty()) {
+            s3Service.deleteImages(objectKeysToDelete);
+        }
     }
 
     private String generateUniqueSku(Brand brand, Product parentProduct, String productName) {
@@ -457,7 +540,7 @@ public class ProductServiceImpl implements ProductService {
 
         if (!parentImages.isEmpty()) {
             List<ProductImage> variantImages = parentImages.stream()
-                    .filter(img -> s3Service.imageExists(img.getObjectKey())) // Validate S3 existence
+                    .filter(img -> s3Service.imageExists(img.getObjectKey()))
                     .map(parentImage -> {
                         ProductImage variantImage = new ProductImage();
                         variantImage.setObjectKey(parentImage.getObjectKey());
@@ -509,22 +592,6 @@ public class ProductServiceImpl implements ProductService {
         }
     }
 
-    private void deleteProductImages(Product product) {
-        List<String> objectKeys = new ArrayList<>();
-
-        if (product.getThumbnailObjectKey() != null) {
-            objectKeys.add(product.getThumbnailObjectKey());
-        }
-
-        objectKeys.addAll(product.getProductImages().stream()
-                .map(ProductImage::getObjectKey)
-                .toList());
-
-        if (!objectKeys.isEmpty()) {
-            s3Service.deleteImages(objectKeys);
-        }
-    }
-
     private Specification<Product> buildProductSpecification(ProductSearchFilters filters) {
         return (root, query, criteriaBuilder) -> {
             List<jakarta.persistence.criteria.Predicate> predicates = new ArrayList<>();
@@ -573,7 +640,6 @@ public class ProductServiceImpl implements ProductService {
         return (root, query, criteriaBuilder) -> {
             List<jakarta.persistence.criteria.Predicate> predicates = new ArrayList<>();
 
-            // Exclude VARIANT products - only show PARENT and STANDALONE
             predicates.add(criteriaBuilder.notEqual(root.get("variantType"), VariantType.VARIANT));
 
             if (filters.getKeyword() != null && !filters.getKeyword().trim().isEmpty()) {
@@ -850,7 +916,6 @@ public class ProductServiceImpl implements ProductService {
             variantImage.ifPresent(productImageRepository::delete);
         }
     }
-
 
     @Scheduled(cron = "0 0 2 * * ?")
     public void cleanupOrphanedImageReferences() {

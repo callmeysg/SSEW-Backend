@@ -11,7 +11,6 @@ import static com.singhtwenty2.ssew_core.data.dto.catalog_management.ProductDTO.
 
 public interface ProductService {
 
-    // Core CRUD operations
     ProductResponse createProduct(CreateProductRequest request);
 
     ProductResponse createVariant(String parentProductId, CreateVariantRequest request);
@@ -26,39 +25,23 @@ public interface ProductService {
 
     void deleteProduct(String productId);
 
-    // Product listing and search
+    void deleteVariant(String variantId);
 
-    /**
-     * Get all products excluding variants (for frontend/customer facing API)
-     * Returns only PARENT and STANDALONE products
-     */
     Page<ProductSummary> getAllProducts(ProductSearchFilters filters, Pageable pageable);
 
-    /**
-     * Get all products including variants (for admin purposes)
-     * Returns PARENT, STANDALONE, and VARIANT products
-     */
     Page<ProductSummary> getAllProductsIncludingVariants(ProductSearchFilters filters, Pageable pageable);
 
     List<ProductVariantInfo> getProductVariants(String productId);
 
-    // Image management
     String uploadProductThumbnail(String productId, MultipartFile file);
 
     List<String> uploadProductImages(String productId, List<MultipartFile> files);
 
-    /**
-     * Delete product image by image ID
-     */
     void deleteProductImage(String productId, String imageId);
 
-    /**
-     * Delete product image by object key (supports both thumbnail and catalog images)
-     */
     void deleteProductImageByObjectKey(String productId, String objectKey);
 
     PresignedUrlResponse getProductImageUrl(String objectKey);
 
-    // Statistics and analytics
     ProductStatsResponse getProductStats();
 }

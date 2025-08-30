@@ -13,6 +13,7 @@ import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ControllerAdvice;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.multipart.MaxUploadSizeExceededException;
+import org.springframework.web.server.ResponseStatusException;
 import org.springframework.web.servlet.NoHandlerFoundException;
 
 import java.util.HashMap;
@@ -23,6 +24,23 @@ import static com.singhtwenty2.ssew_core.util.io.NetworkUtils.getClientIP;
 @ControllerAdvice
 @Slf4j
 public class GlobalExceptionHandler {
+
+    @ExceptionHandler(ResponseStatusException.class)
+    public ResponseEntity<GlobalApiResponse<Object>> handleResponseStatusException(
+            ResponseStatusException ex,
+            HttpServletRequest request) {
+
+        log.warn("Response status exception: {} {} from IP: {}",
+                ex.getStatusCode(), ex.getReason(), getClientIP(request));
+
+        return ResponseEntity.status(ex.getStatusCode()).body(
+                GlobalApiResponse.builder()
+                        .success(false)
+                        .message(ex.getReason() != null ? ex.getReason() : "Request failed")
+                        .data(null)
+                        .build()
+        );
+    }
 
     @ExceptionHandler(BusinessException.class)
     public ResponseEntity<GlobalApiResponse<Object>> handleBusinessException(

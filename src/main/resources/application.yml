@@ -41,5 +41,26 @@ logging:
   level:
     com.singhtwenty2: DEBUG
 
+sentry:
+  dsn: https://ad18eb754e205240603dc689a13414d9@o4509932630441984.ingest.us.sentry.io/4509932658360320
 
+  send-default-pii: true
 
+  logging:
+    enabled: true
+    minimum-event-level: warn
+    minimum-breadcrumb-level: info
+
+  traces-sample-rate: 0.1
+
+  environment: development
+
+  release: ssew-core@0.0.1-SNAPSHOT
+
+  enable-tracing: true
+
+  debug: true
+
+  tags:
+    service: ssew-core
+    version: 0.0.1-SNAPSHOT

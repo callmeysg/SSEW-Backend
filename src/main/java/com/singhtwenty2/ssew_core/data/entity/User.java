@@ -121,6 +121,9 @@ public class User extends BaseEntity implements UserDetails {
     }
 
     public boolean canLogin() {
-        return isActive && !isAccountLocked && (isEmailVerified || isMobileVerified);
+        // Uncomment the below line if you want to enforce email or mobile verification for login
+        // As per CLIENT'S requirement, commenting it out
+        // return isActive && !isAccountLocked && (isEmailVerified || isMobileVerified);
+        return isActive && !isAccountLocked;
     }
 }

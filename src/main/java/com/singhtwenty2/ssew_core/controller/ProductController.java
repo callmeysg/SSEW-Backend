@@ -143,7 +143,6 @@ public class ProductController {
         );
     }
 
-    // Main endpoint for frontend - excludes variants
     @GetMapping("/search")
     public ResponseEntity<GlobalApiResponse<PageResponse<ProductSummary>>> searchProducts(
             @RequestParam(required = false) String keyword,
@@ -193,7 +192,6 @@ public class ProductController {
         );
     }
 
-    // Admin endpoint - includes all products including variants
     @GetMapping("/admin/all")
     @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<GlobalApiResponse<PageResponse<ProductSummary>>> getAllProductsIncludingVariants(
@@ -302,6 +300,27 @@ public class ProductController {
                 GlobalApiResponse.<Void>builder()
                         .success(true)
                         .message("Product deleted successfully")
+                        .build()
+        );
+    }
+
+    @DeleteMapping("/{productId}/variants")
+    @PreAuthorize("hasRole('ADMIN')")
+    public ResponseEntity<GlobalApiResponse<Void>> deleteVariant(
+            @PathVariable String productId,
+            HttpServletRequest request
+    ) {
+        log.info("Variant deletion attempt from IP: {} for ID: {}",
+                getClientIP(request), productId);
+
+        productService.deleteVariant(productId);
+
+        log.info("Variant deleted successfully with ID: {}", productId);
+
+        return ResponseEntity.ok(
+                GlobalApiResponse.<Void>builder()
+                        .success(true)
+                        .message("Product variant deleted successfully")
                         .build()
         );
     }
