@@ -83,6 +83,11 @@ jobs:
             AWS_S3_TEMP_BUCKET=ssew-bucket-staging
             AWS_S3_TEMP_FOLDER=temp
             AWS_S3_PERMANENT_FOLDER=permanent
+            # Override database URL to use local container
+            SPRING_DATASOURCE_URL=jdbc:postgresql://postgres:5432/ssew
+            SPRING_DATASOURCE_USERNAME=ssew_owner
+            SPRING_DATASOURCE_PASSWORD=ssew_staging_pass
+            SPRING_DATA_REDIS_URL=redis://:redis_staging_pass@redis:6379
             EOF
             
             # Set secure permissions on .env file
