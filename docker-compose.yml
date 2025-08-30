@@ -55,6 +55,7 @@ services:
       AWS_SECRET_ACCESS_KEY: ${AWS_SECRET_ACCESS_KEY}
       JWT_SECRET: ${JWT_SECRET}
       APP_SECURITY_DEVELOPER_SECRET: ${APP_DEVELOPER_SECRET}
+      SENTRY_AUTH_TOKEN: ${SENTRY_AUTH_TOKEN}
     depends_on:
       postgres:
         condition: service_healthy

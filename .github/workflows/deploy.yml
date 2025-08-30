@@ -67,20 +67,26 @@ jobs:
             # Download latest docker-compose.yml
             curl -o docker-compose.yml https://raw.githubusercontent.com/${{ github.repository }}/main/docker-compose.yml
             
-            # Set environment variables
-            export IMAGE_TAG=staging-${{ steps.build-number.outputs.BUILD_NUMBER }}
-            export AWS_ACCESS_KEY_ID="${{ secrets.AWS_ACCESS_KEY_ID }}"
-            export AWS_SECRET_ACCESS_KEY="${{ secrets.AWS_SECRET_ACCESS_KEY }}"
-            export JWT_SECRET="${{ secrets.JWT_SECRET }}"
-            export APP_DEVELOPER_SECRET="${{ secrets.APP_DEVELOPER_SECRET }}"
-            export POSTGRES_DB="ssew"
-            export POSTGRES_USER="ssew_owner"  
-            export POSTGRES_PASSWORD="ssew_staging_pass"
-            export REDIS_PASSWORD="redis_staging_pass"
-            export AWS_REGION="ap-south-1"
-            export AWS_S3_TEMP_BUCKET="ssew-bucket-staging"
-            export AWS_S3_TEMP_FOLDER="temp"
-            export AWS_S3_PERMANENT_FOLDER="permanent"
+            # Create .env file with all environment variables
+            cat > .env << EOF
+            IMAGE_TAG=staging-${{ steps.build-number.outputs.BUILD_NUMBER }}
+            AWS_ACCESS_KEY_ID=${{ secrets.AWS_ACCESS_KEY_ID }}
+            AWS_SECRET_ACCESS_KEY=${{ secrets.AWS_SECRET_ACCESS_KEY }}
+            JWT_SECRET=${{ secrets.JWT_SECRET }}
+            APP_DEVELOPER_SECRET=${{ secrets.APP_DEVELOPER_SECRET }}
+            SENTRY_AUTH_TOKEN=${{ secrets.SENTRY_AUTH_TOKEN }}
+            POSTGRES_DB=ssew
+            POSTGRES_USER=ssew_owner
+            POSTGRES_PASSWORD=ssew_staging_pass
+            REDIS_PASSWORD=redis_staging_pass
+            AWS_REGION=ap-south-1
+            AWS_S3_TEMP_BUCKET=ssew-bucket-staging
+            AWS_S3_TEMP_FOLDER=temp
+            AWS_S3_PERMANENT_FOLDER=permanent
+            EOF
+            
+            # Set secure permissions on .env file
+            chmod 600 .env
             
             # Stop existing containers
             docker-compose down
@@ -114,5 +120,8 @@ jobs:
             # Show application logs (last 50 lines)
             echo "Application logs:"
             docker-compose logs --tail=50 app
+            
+            # Clean up .env file for security (optional)
+            # rm .env
             
             echo "Deployment completed!"

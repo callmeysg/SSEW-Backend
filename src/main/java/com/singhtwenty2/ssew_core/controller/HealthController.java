@@ -13,7 +13,7 @@ public class HealthController {
     public PingDTO ping() {
         return PingDTO
                 .builder()
-                .message("pong")
+                .message("pong 🤡")
                 .build();
     }
 }
