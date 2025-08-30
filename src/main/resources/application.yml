@@ -1,8 +1,8 @@
 spring:
   application:
     name: ssew-core
-  profiles:
-    include: secrets
+#  profiles:
+#    include: secrets
   datasource:
     driver-class-name: org.postgresql.Driver
   jpa:
