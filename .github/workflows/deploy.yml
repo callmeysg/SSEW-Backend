@@ -4,6 +4,15 @@ on:
   push:
     branches: [ main ]
   workflow_dispatch:
+    inputs:
+      fresh_deploy:
+        description: 'Fresh deployment (removes all data)'
+        required: false
+        default: 'false'
+        type: choice
+        options:
+          - 'false'
+          - 'true'
 
 env:
   REGISTRY: docker.io
@@ -93,40 +102,73 @@ jobs:
             # Set secure permissions on .env file
             chmod 600 .env
             
-            # Stop existing containers
-            docker-compose down
+            # Check if this is a fresh deployment
+            FRESH_DEPLOY="${{ github.event.inputs.fresh_deploy || 'false' }}"
             
-            # Clean up old images
+            if [ "$FRESH_DEPLOY" = "true" ]; then
+              echo "🔥 Fresh deployment requested - removing all data"
+              # Stop containers and remove volumes
+              docker-compose down -v
+              # Remove containers and volumes completely
+              docker rm -f ssew-postgres ssew-redis ssew-app 2>/dev/null || true
+              docker volume rm ssew-deployment_postgres_data 2>/dev/null || true
+              docker volume rm ssew-deployment_redis_data 2>/dev/null || true
+              echo "✅ All data cleared"
+            else
+              echo "🔄 Incremental deployment - preserving database data"
+              # Only stop the app container, keep databases running
+              docker-compose stop app
+              docker rm -f ssew-app 2>/dev/null || true
+            
+              # Check if databases are running, if not start them
+              if ! docker-compose ps postgres | grep -q "Up"; then
+                echo "Starting PostgreSQL..."
+                docker-compose up -d postgres
+              fi
+            
+              if ! docker-compose ps redis | grep -q "Up"; then
+                echo "Starting Redis..."
+                docker-compose up -d redis
+              fi
+            fi
+            
+            # Clean up old app images
             docker image prune -f
             
-            # Pull latest images
-            docker-compose pull
+            # Pull latest app image
+            docker-compose pull app
             
-            # Start all services (databases will start first due to depends_on with health checks)
-            docker-compose up -d
+            # Start/restart the application
+            docker-compose up -d app
             
             # Wait for services to be healthy
             echo "Waiting for services to be healthy..."
             timeout=300
             while [ $timeout -gt 0 ]; do
-              if docker-compose ps | grep -E "(healthy|Up)" | wc -l | grep -q "3"; then
-                echo "All services are up and healthy!"
+              healthy_count=$(docker-compose ps | grep -c "healthy\|Up")
+              total_services=$(docker-compose ps | grep -c "ssew-")
+            
+              if [ "$healthy_count" -eq "$total_services" ]; then
+                echo "✅ All services are up and healthy!"
                 break
               fi
-              echo "Waiting for services... ($timeout seconds remaining)"
+            
+              echo "⏳ Waiting for services... ($timeout seconds remaining)"
+              echo "   Healthy: $healthy_count/$total_services"
               sleep 10
               timeout=$((timeout-10))
             done
             
             # Show service status
-            echo "Service status:"
+            echo "📊 Service status:"
             docker-compose ps
             
-            # Show application logs (last 50 lines)
-            echo "Application logs:"
-            docker-compose logs --tail=50 app
+            # Show application logs (last 20 lines)
+            echo "📋 Application logs:"
+            docker-compose logs --tail=20 app
             
-            # Clean up .env file for security (optional)
-            # rm .env
-            
-            echo "Deployment completed!"
+            if [ "$FRESH_DEPLOY" = "true" ]; then
+              echo "🎉 Fresh deployment completed!"
+            else
+              echo "🎉 Incremental deployment completed!"
+            fi
