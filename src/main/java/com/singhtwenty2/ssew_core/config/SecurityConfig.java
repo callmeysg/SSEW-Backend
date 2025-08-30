@@ -99,7 +99,7 @@ public class SecurityConfig {
                 "https://srishastabangalore.in",
                 "https://dash.srishastabangalore.in",
                 "https://www.srishastabangalore.in",
-                "https://*.srishastabangalore.com"
+                "https://*.srishastabangalore.in"
         ));
 
         configuration.setAllowedMethods(Arrays.asList(
