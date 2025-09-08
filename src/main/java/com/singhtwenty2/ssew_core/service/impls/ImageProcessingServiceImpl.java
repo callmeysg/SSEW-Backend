@@ -1,6 +1,6 @@
 package com.singhtwenty2.ssew_core.service.impls;
 
-import com.singhtwenty2.ssew_core.service.ImageProcessingService;
+import com.singhtwenty2.ssew_core.service.file_handeling.ImageProcessingService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpStatus;
@@ -21,7 +21,7 @@ import java.io.IOException;
 import java.util.Arrays;
 import java.util.Iterator;
 
-import static com.singhtwenty2.ssew_core.data.dto.catalog_management.ImageDTO.*;
+import static com.singhtwenty2.ssew_core.data.dto.catalogue.ImageDTO.*;
 
 @Service
 @Slf4j
@@ -78,7 +78,7 @@ public class ImageProcessingServiceImpl implements ImageProcessingService {
     }
 
     @Override
-    public ProcessedImageResult processBrandLogo(MultipartFile file) {
+    public ProcessedImageResult processManufacturerLogo(MultipartFile file) {
         return processImage(file, ImageProcessingConfig.brandLogo());
     }
 

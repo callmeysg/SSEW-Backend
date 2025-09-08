@@ -4,6 +4,7 @@ import com.singhtwenty2.ssew_core.annotation.ApiDeprecated;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.lang.NonNull;
 import org.springframework.stereotype.Component;
 import org.springframework.web.method.HandlerMethod;
 import org.springframework.web.servlet.HandlerInterceptor;
@@ -15,7 +16,10 @@ import static com.singhtwenty2.ssew_core.util.io.NetworkUtils.getClientIP;
 public class DeprecationInterceptor implements HandlerInterceptor {
 
     @Override
-    public boolean preHandle(HttpServletRequest request, HttpServletResponse response, Object handler) {
+    public boolean preHandle(
+            @NonNull HttpServletRequest request,
+            @NonNull HttpServletResponse response,
+            @NonNull Object handler) {
         if (handler instanceof HandlerMethod handlerMethod) {
             ApiDeprecated deprecated = handlerMethod.getMethodAnnotation(ApiDeprecated.class);
 

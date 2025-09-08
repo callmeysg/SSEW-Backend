@@ -45,16 +45,6 @@ public class Category extends BaseEntity {
     @Column(name = "meta_description", length = 300)
     private String metaDescription;
 
-    @OneToMany(mappedBy = "category", cascade = CascadeType.ALL, fetch = FetchType.LAZY)
-    private List<Brand> brands = new ArrayList<>();
-
-    public void addBrand(Brand brand) {
-        brands.add(brand);
-        brand.setCategory(this);
-    }
-
-    public void removeBrand(Brand brand) {
-        brands.remove(brand);
-        brand.setCategory(null);
-    }
+    @ManyToMany(mappedBy = "categories", cascade = {CascadeType.PERSIST, CascadeType.MERGE}, fetch = FetchType.LAZY)
+    private List<Manufacturer> manufacturers = new ArrayList<>();
 }

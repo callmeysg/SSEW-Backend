@@ -51,29 +51,34 @@ public class SecurityConfig {
 
                         // Category GET endpoints (public access)
                         .requestMatchers(HttpMethod.GET, "/v1/categories").permitAll()                    // Get all categories
-                        .requestMatchers(HttpMethod.GET, "/v1/categories/*").permitAll()                  // Get category by ID
-                        .requestMatchers(HttpMethod.GET, "/v1/categories/slug/*").permitAll()             // Get category by slug
+                        .requestMatchers(HttpMethod.GET, "/v1/categories/**").permitAll()                 // Get category by ID and slug
                         .requestMatchers(HttpMethod.GET, "/v1/categories/active").permitAll()             // Get active categories
                         .requestMatchers(HttpMethod.GET, "/v1/categories/search").permitAll()             // Search categories
                         .requestMatchers(HttpMethod.GET, "/v1/categories/active/ordered").permitAll()     // Get active categories ordered
 
-                        // Brand GET endpoints (public access)
-                        .requestMatchers(HttpMethod.GET, "/v1/brands").permitAll()                        // Get all brands
-                        .requestMatchers(HttpMethod.GET, "/v1/brands/*").permitAll()                      // Get brand by ID
-                        .requestMatchers(HttpMethod.GET, "/v1/brands/slug/*").permitAll()                 // Get brand by slug
-                        .requestMatchers(HttpMethod.GET, "/v1/brands/active").permitAll()                 // Get active brands
-                        .requestMatchers(HttpMethod.GET, "/v1/brands/category/*").permitAll()             // Get brands by category
-                        .requestMatchers(HttpMethod.GET, "/v1/brands/category/*/active").permitAll()      // Get active brands by category
-                        .requestMatchers(HttpMethod.GET, "/v1/brands/category/*/ordered").permitAll()     // Get brands by category ordered
-                        .requestMatchers(HttpMethod.GET, "/v1/brands/search").permitAll()                 // Search brands
+                        // Manufacturer GET endpoints (public access) - CORRECTED
+                        .requestMatchers(HttpMethod.GET, "/v1/manufacturers").permitAll()                 // Get all manufacturers
+                        .requestMatchers(HttpMethod.GET, "/v1/manufacturers/active").permitAll()          // Get active manufacturers
+                        .requestMatchers(HttpMethod.GET, "/v1/manufacturers/categories").permitAll()      // Get manufacturers by categories
+                        .requestMatchers(HttpMethod.GET, "/v1/manufacturers/categories/active").permitAll() // Get active manufacturers by categories
+                        .requestMatchers(HttpMethod.GET, "/v1/manufacturers/categories/ordered").permitAll() // Get manufacturers by categories ordered
+                        .requestMatchers(HttpMethod.GET, "/v1/manufacturers/search").permitAll()          // Search manufacturers
+                        .requestMatchers(HttpMethod.GET, "/v1/manufacturers/slug/**").permitAll()         // Get the manufacturer by slug
+                        .requestMatchers(HttpMethod.GET, "/v1/manufacturers/**").permitAll()              // Get the manufacturer by ID (this should be last)
 
-                        // Product GET endpoints (public access) - Updated with actual ProductController routes
-                        .requestMatchers(HttpMethod.GET, "/v1/products/{productId}").permitAll()          // Get product by ID
-                        .requestMatchers(HttpMethod.GET, "/v1/products/slug/{slug}").permitAll()          // Get product by slug
-                        .requestMatchers(HttpMethod.GET, "/v1/products/sku/{sku}").permitAll()            // Get product by SKU
+                        // Compatibility Brand GET endpoints (public access)
+                        .requestMatchers(HttpMethod.GET, "/v1/compatibility-brands").permitAll()                        // Get all compatibility brands
+                        .requestMatchers(HttpMethod.GET, "/v1/compatibility-brands/slug/**").permitAll()                // Get compatibility brand by slug
+                        .requestMatchers(HttpMethod.GET, "/v1/compatibility-brands/search").permitAll()                 // Search compatibility brands
+                        .requestMatchers(HttpMethod.GET, "/v1/compatibility-brands/**").permitAll()                     // Get compatibility brand by ID
+
+                        // Product GET endpoints (public access)
+                        .requestMatchers(HttpMethod.GET, "/v1/products/slug/**").permitAll()              // Get product by slug
+                        .requestMatchers(HttpMethod.GET, "/v1/products/sku/**").permitAll()               // Get product by SKU
                         .requestMatchers(HttpMethod.GET, "/v1/products/search").permitAll()               // Search products with filters
-                        .requestMatchers(HttpMethod.GET, "/v1/products/{productId}/variants").permitAll() // Get product variants
-                        .requestMatchers(HttpMethod.GET, "/v1/products/images").permitAll() // Get product image presigned URL
+                        .requestMatchers(HttpMethod.GET, "/v1/products/images").permitAll()               // Get product image presigned URL
+                        .requestMatchers(HttpMethod.GET, "/v1/products/*/variants").permitAll()           // Get product variants
+                        .requestMatchers(HttpMethod.GET, "/v1/products/**").permitAll()                   // Get product by ID
 
                         .anyRequest().authenticated()
                 )

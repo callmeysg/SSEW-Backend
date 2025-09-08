@@ -1,19 +1,21 @@
 package com.singhtwenty2.ssew_core.service.impls;
 
-import com.singhtwenty2.ssew_core.data.entity.Brand;
+import com.singhtwenty2.ssew_core.data.entity.CompatibilityBrand;
+import com.singhtwenty2.ssew_core.data.entity.Manufacturer;
 import com.singhtwenty2.ssew_core.data.entity.Product;
 import com.singhtwenty2.ssew_core.data.entity.ProductImage;
 import com.singhtwenty2.ssew_core.data.enums.VariantType;
-import com.singhtwenty2.ssew_core.data.repository.BrandRepository;
+import com.singhtwenty2.ssew_core.data.repository.CompatibilityBrandRepository;
+import com.singhtwenty2.ssew_core.data.repository.ManufacturerRepository;
 import com.singhtwenty2.ssew_core.data.repository.ProductImageRepository;
 import com.singhtwenty2.ssew_core.data.repository.ProductRepository;
 import com.singhtwenty2.ssew_core.exception.BusinessException;
 import com.singhtwenty2.ssew_core.exception.ResourceNotFoundException;
-import com.singhtwenty2.ssew_core.service.ImageProcessingService;
-import com.singhtwenty2.ssew_core.service.ProductService;
-import com.singhtwenty2.ssew_core.service.S3Service;
-import com.singhtwenty2.ssew_core.util.SlugGenerator;
+import com.singhtwenty2.ssew_core.service.catalogue.ProductService;
+import com.singhtwenty2.ssew_core.service.file_handeling.ImageProcessingService;
+import com.singhtwenty2.ssew_core.service.file_handeling.S3Service;
 import com.singhtwenty2.ssew_core.util.sanitizer.SpecificationSanitizer;
+import com.singhtwenty2.ssew_core.util.slug.SlugGenerator;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.Page;
@@ -31,10 +33,10 @@ import java.util.*;
 import java.util.concurrent.ThreadLocalRandom;
 import java.util.stream.Collectors;
 
-import static com.singhtwenty2.ssew_core.data.dto.catalog_management.ImageDTO.ImageUploadResult;
-import static com.singhtwenty2.ssew_core.data.dto.catalog_management.ImageDTO.ProcessedImageResult;
-import static com.singhtwenty2.ssew_core.data.dto.catalog_management.PreSignedUrlDTO.PresignedUrlResponse;
-import static com.singhtwenty2.ssew_core.data.dto.catalog_management.ProductDTO.*;
+import static com.singhtwenty2.ssew_core.data.dto.catalogue.ImageDTO.ImageUploadResult;
+import static com.singhtwenty2.ssew_core.data.dto.catalogue.ImageDTO.ProcessedImageResult;
+import static com.singhtwenty2.ssew_core.data.dto.catalogue.PreSignedUrlDTO.PresignedUrlResponse;
+import static com.singhtwenty2.ssew_core.data.dto.catalogue.ProductDTO.*;
 
 @Service
 @RequiredArgsConstructor
@@ -43,7 +45,8 @@ import static com.singhtwenty2.ssew_core.data.dto.catalog_management.ProductDTO.
 public class ProductServiceImpl implements ProductService {
 
     private final ProductRepository productRepository;
-    private final BrandRepository brandRepository;
+    private final ManufacturerRepository manufacturerRepository;
+    private final CompatibilityBrandRepository compatibilityBrandRepository;
     private final ProductImageRepository productImageRepository;
     private final S3Service s3Service;
     private final ImageProcessingService imageProcessingService;
@@ -54,8 +57,8 @@ public class ProductServiceImpl implements ProductService {
     public ProductResponse createProduct(CreateProductRequest request) {
         log.info("Creating product with name: {}", request.getName());
 
-        Brand brand = brandRepository.findById(UUID.fromString(request.getBrandId()))
-                .orElseThrow(() -> new ResourceNotFoundException("Brand not found with ID: " + request.getBrandId()));
+        Manufacturer manufacturer = manufacturerRepository.findById(UUID.fromString(request.getManufacturerId()))
+                .orElseThrow(() -> new ResourceNotFoundException("Manufacturer not found with ID: " + request.getManufacturerId()));
 
         Product parentProduct = null;
         if (request.getParentProductId() != null) {
@@ -71,11 +74,24 @@ public class ProductServiceImpl implements ProductService {
         validateProductData(request, null);
 
         Product product = new Product();
-        mapCreateRequestToProduct(request, product, brand, parentProduct);
+        mapCreateRequestToProduct(request, product, manufacturer, parentProduct);
 
-        String sku = generateUniqueSku(brand, parentProduct, request.getName());
+        String sku = generateUniqueSku(manufacturer, parentProduct, request.getName());
         product.setSku(sku);
         product.setSlug(generateUniqueSlug(request.getName()));
+
+        if (request.getCompatibilityBrandIds() != null && !request.getCompatibilityBrandIds().isEmpty()) {
+            List<CompatibilityBrand> compatibilityBrands = compatibilityBrandRepository
+                    .findAllById(request.getCompatibilityBrandIds().stream()
+                            .map(UUID::fromString)
+                            .collect(Collectors.toList()));
+
+            if (compatibilityBrands.size() != request.getCompatibilityBrandIds().size()) {
+                throw new ResourceNotFoundException("One or more compatibility brands not found");
+            }
+
+            compatibilityBrands.forEach(product::addCompatibilityBrand);
+        }
 
         product = productRepository.save(product);
 
@@ -101,17 +117,30 @@ public class ProductServiceImpl implements ProductService {
             throw new BusinessException("Cannot create variant for a variant product. Variants can only be created for parent or standalone products.");
         }
 
-        Brand brand = parentProduct.getBrand();
+        Manufacturer manufacturer = parentProduct.getManufacturer();
 
         Product variant = new Product();
-        mapVariantRequestToProduct(request, variant, brand);
+        mapVariantRequestToProduct(request, variant, manufacturer);
 
-        String sku = generateUniqueSku(brand, parentProduct, request.getName());
+        String sku = generateUniqueSku(manufacturer, parentProduct, request.getName());
         variant.setSku(sku);
         variant.setSlug(generateUniqueSlug(request.getName()));
 
         variant.setParentProduct(parentProduct);
         variant.setVariantType(VariantType.VARIANT);
+
+        if (request.getCompatibilityBrandIds() != null && !request.getCompatibilityBrandIds().isEmpty()) {
+            List<CompatibilityBrand> compatibilityBrands = compatibilityBrandRepository
+                    .findAllById(request.getCompatibilityBrandIds().stream()
+                            .map(UUID::fromString)
+                            .collect(Collectors.toList()));
+
+            if (compatibilityBrands.size() != request.getCompatibilityBrandIds().size()) {
+                throw new ResourceNotFoundException("One or more compatibility brands not found");
+            }
+
+            compatibilityBrands.forEach(variant::addCompatibilityBrand);
+        }
 
         variant = productRepository.save(variant);
 
@@ -160,10 +189,27 @@ public class ProductServiceImpl implements ProductService {
 
         mapUpdateRequestToProduct(request, product);
 
-        if (request.getBrandId() != null && !request.getBrandId().equals(product.getBrand().getId().toString())) {
-            Brand newBrand = brandRepository.findById(UUID.fromString(request.getBrandId()))
-                    .orElseThrow(() -> new ResourceNotFoundException("Brand not found"));
-            product.setBrand(newBrand);
+        if (request.getManufacturerId() != null && !request.getManufacturerId().equals(product.getManufacturer().getId().toString())) {
+            Manufacturer newManufacturer = manufacturerRepository.findById(UUID.fromString(request.getManufacturerId()))
+                    .orElseThrow(() -> new ResourceNotFoundException("Manufacturer not found"));
+            product.setManufacturer(newManufacturer);
+        }
+
+        if (request.getCompatibilityBrandIds() != null) {
+            product.clearCompatibilityBrands();
+
+            if (!request.getCompatibilityBrandIds().isEmpty()) {
+                List<CompatibilityBrand> compatibilityBrands = compatibilityBrandRepository
+                        .findAllById(request.getCompatibilityBrandIds().stream()
+                                .map(UUID::fromString)
+                                .collect(Collectors.toList()));
+
+                if (compatibilityBrands.size() != request.getCompatibilityBrandIds().size()) {
+                    throw new ResourceNotFoundException("One or more compatibility brands not found");
+                }
+
+                compatibilityBrands.forEach(product::addCompatibilityBrand);
+            }
         }
 
         product = productRepository.save(product);
@@ -464,18 +510,18 @@ public class ProductServiceImpl implements ProductService {
         }
     }
 
-    private String generateUniqueSku(Brand brand, Product parentProduct, String productName) {
+    private String generateUniqueSku(Manufacturer manufacturer, Product parentProduct, String productName) {
         String baseSku;
 
         if (parentProduct != null) {
             String parentBaseSku = extractBaseSku(parentProduct.getSku());
             baseSku = parentBaseSku + "-V";
         } else {
-            String categoryCode = brand.getCategory() != null ?
-                    cleanAndTruncate(brand.getCategory().getName()).toUpperCase() : "GEN";
-            String brandCode = cleanAndTruncate(brand.getName()).toUpperCase();
+            String categoryCode = manufacturer.getCategories() != null && !manufacturer.getCategories().isEmpty() ?
+                    cleanAndTruncate(manufacturer.getCategories().get(0).getName()).toUpperCase() : "GEN";
+            String manufacturerCode = cleanAndTruncate(manufacturer.getName()).toUpperCase();
             String productCode = cleanAndTruncate(productName).toUpperCase();
-            baseSku = String.format("SSEW-%s-%s-%s", categoryCode, brandCode, productCode);
+            baseSku = String.format("SSEW-%s-%s-%s", categoryCode, manufacturerCode, productCode);
         }
 
         String uniqueSku;
@@ -610,12 +656,19 @@ public class ProductServiceImpl implements ProductService {
 
             if (filters.getCategoryId() != null) {
                 predicates.add(criteriaBuilder.equal(
-                        root.get("brand").get("category").get("id"), UUID.fromString(filters.getCategoryId())));
+                        root.join("manufacturer").join("categories").get("id"), UUID.fromString(filters.getCategoryId())));
             }
 
-            if (filters.getBrandId() != null) {
+            if (filters.getManufacturerId() != null) {
                 predicates.add(criteriaBuilder.equal(
-                        root.get("brand").get("id"), UUID.fromString(filters.getBrandId())));
+                        root.get("manufacturer").get("id"), UUID.fromString(filters.getManufacturerId())));
+            }
+
+            if (filters.getCompatibilityBrandIds() != null && !filters.getCompatibilityBrandIds().isEmpty()) {
+                List<UUID> compatibilityBrandUuids = filters.getCompatibilityBrandIds().stream()
+                        .map(UUID::fromString)
+                        .collect(Collectors.toList());
+                predicates.add(root.join("compatibilityBrands").get("id").in(compatibilityBrandUuids));
             }
 
             if (filters.getMinPrice() != null) {
@@ -656,12 +709,19 @@ public class ProductServiceImpl implements ProductService {
 
             if (filters.getCategoryId() != null) {
                 predicates.add(criteriaBuilder.equal(
-                        root.get("brand").get("category").get("id"), UUID.fromString(filters.getCategoryId())));
+                        root.join("manufacturer").join("categories").get("id"), UUID.fromString(filters.getCategoryId())));
             }
 
-            if (filters.getBrandId() != null) {
+            if (filters.getManufacturerId() != null) {
                 predicates.add(criteriaBuilder.equal(
-                        root.get("brand").get("id"), UUID.fromString(filters.getBrandId())));
+                        root.get("manufacturer").get("id"), UUID.fromString(filters.getManufacturerId())));
+            }
+
+            if (filters.getCompatibilityBrandIds() != null && !filters.getCompatibilityBrandIds().isEmpty()) {
+                List<UUID> compatibilityBrandUuids = filters.getCompatibilityBrandIds().stream()
+                        .map(UUID::fromString)
+                        .collect(Collectors.toList());
+                predicates.add(root.join("compatibilityBrands").get("id").in(compatibilityBrandUuids));
             }
 
             if (filters.getMinPrice() != null) {
@@ -682,7 +742,7 @@ public class ProductServiceImpl implements ProductService {
         };
     }
 
-    private void mapCreateRequestToProduct(CreateProductRequest request, Product product, Brand brand, Product parentProduct) {
+    private void mapCreateRequestToProduct(CreateProductRequest request, Product product, Manufacturer manufacturer, Product parentProduct) {
         product.setName(request.getName());
         product.setModelNumber(request.getModelNumber());
         product.setDescription(request.getDescription());
@@ -697,7 +757,7 @@ public class ProductServiceImpl implements ProductService {
         product.setMetaDescription(request.getMetaDescription());
         product.setMetaKeywords(request.getMetaKeywords());
         product.setSearchTags(request.getSearchTags());
-        product.setBrand(brand);
+        product.setManufacturer(manufacturer);
         product.setParentProduct(parentProduct);
 
         if (parentProduct != null) {
@@ -707,7 +767,7 @@ public class ProductServiceImpl implements ProductService {
         }
     }
 
-    private void mapVariantRequestToProduct(CreateVariantRequest request, Product variant, Brand brand) {
+    private void mapVariantRequestToProduct(CreateVariantRequest request, Product variant, Manufacturer manufacturer) {
         variant.setName(request.getName());
         variant.setModelNumber(request.getModelNumber());
         variant.setDescription(request.getDescription());
@@ -720,7 +780,7 @@ public class ProductServiceImpl implements ProductService {
         variant.setMetaDescription(request.getMetaDescription());
         variant.setMetaKeywords(request.getMetaKeywords());
         variant.setSearchTags(request.getSearchTags());
-        variant.setBrand(brand);
+        variant.setManufacturer(manufacturer);
         variant.setVariantType(VariantType.VARIANT);
     }
 
@@ -769,11 +829,22 @@ public class ProductServiceImpl implements ProductService {
                         ? product.getCreatedAt().format(DateTimeFormatter.ISO_LOCAL_DATE_TIME) : null)
                 .updatedAt(product.getUpdatedAt() != null
                         ? product.getUpdatedAt().format(DateTimeFormatter.ISO_LOCAL_DATE_TIME) : null)
-                .brandId(product.getBrand().getId().toString())
-                .brandName(product.getBrandName())
-                .categoryId(product.getCategoryId())
-                .categoryName(product.getCategoryName())
+                .manufacturerId(product.getManufacturer().getId().toString())
+                .manufacturerName(product.getManufacturerName())
+                .categoryIds(product.getCategoryIds())
+                .categoryNames(product.getCategoryNames())
                 .parentProductId(product.getParentProduct() != null ? product.getParentProduct().getId().toString() : null);
+
+        if (product.getCompatibilityBrands() != null && !product.getCompatibilityBrands().isEmpty()) {
+            List<CompatibilityBrandInfo> compatibilityBrandInfos = product.getCompatibilityBrands().stream()
+                    .map(brand -> CompatibilityBrandInfo.builder()
+                            .compatibilityBrandId(brand.getId().toString())
+                            .name(brand.getName())
+                            .slug(brand.getSlug())
+                            .build())
+                    .collect(Collectors.toList());
+            builder.compatibilityBrands(compatibilityBrandInfos);
+        }
 
         if (product.getThumbnailObjectKey() != null &&
             s3Service.imageExists(product.getThumbnailObjectKey())) {
@@ -820,10 +891,21 @@ public class ProductServiceImpl implements ProductService {
                 .isActive(product.getIsActive())
                 .isFeatured(product.getIsFeatured())
                 .variantType(product.getVariantType().name())
-                .brandName(product.getBrandName())
-                .categoryName(product.getCategoryName())
+                .manufacturerName(product.getManufacturerName())
+                .categoryNames(product.getCategoryNames())
                 .totalVariants((long) product.getVariants().size())
                 .createdAt(product.getCreatedAt().format(DateTimeFormatter.ISO_LOCAL_DATE_TIME));
+
+        if (product.getCompatibilityBrands() != null && !product.getCompatibilityBrands().isEmpty()) {
+            List<CompatibilityBrandInfo> compatibilityBrandInfos = product.getCompatibilityBrands().stream()
+                    .map(brand -> CompatibilityBrandInfo.builder()
+                            .compatibilityBrandId(brand.getId().toString())
+                            .name(brand.getName())
+                            .slug(brand.getSlug())
+                            .build())
+                    .collect(Collectors.toList());
+            builder.compatibilityBrands(compatibilityBrandInfos);
+        }
 
         if (product.getThumbnailObjectKey() != null) {
             PresignedUrlResponse thumbnailUrl = s3Service.generateReadPresignedUrl(product.getThumbnailObjectKey(), 60);
@@ -852,6 +934,17 @@ public class ProductServiceImpl implements ProductService {
                 .isActive(variant.getIsActive())
                 .variantPosition(variant.getVariantPosition())
                 .specifications(variant.getSpecifications());
+
+        if (variant.getCompatibilityBrands() != null && !variant.getCompatibilityBrands().isEmpty()) {
+            List<CompatibilityBrandInfo> compatibilityBrandInfos = variant.getCompatibilityBrands().stream()
+                    .map(brand -> CompatibilityBrandInfo.builder()
+                            .compatibilityBrandId(brand.getId().toString())
+                            .name(brand.getName())
+                            .slug(brand.getSlug())
+                            .build())
+                    .collect(Collectors.toList());
+            builder.compatibilityBrands(compatibilityBrandInfos);
+        }
 
         if (variant.getThumbnailObjectKey() != null) {
             PresignedUrlResponse thumbnailUrl = s3Service.generateReadPresignedUrl(variant.getThumbnailObjectKey(), 60);

@@ -1,6 +1,6 @@
 package com.singhtwenty2.ssew_core.config;
 
-import com.singhtwenty2.ssew_core.service.S3Service;
+import com.singhtwenty2.ssew_core.service.file_handeling.S3Service;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.boot.ApplicationArguments;

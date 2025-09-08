@@ -1,6 +1,6 @@
 package com.singhtwenty2.ssew_core.service.impls;
 
-import com.singhtwenty2.ssew_core.service.S3Service;
+import com.singhtwenty2.ssew_core.service.file_handeling.S3Service;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
@@ -23,9 +23,9 @@ import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 
-import static com.singhtwenty2.ssew_core.data.dto.catalog_management.ImageDTO.ImageUploadResult;
-import static com.singhtwenty2.ssew_core.data.dto.catalog_management.ImageDTO.ProcessedImageResult;
-import static com.singhtwenty2.ssew_core.data.dto.catalog_management.PreSignedUrlDTO.PresignedUrlResponse;
+import static com.singhtwenty2.ssew_core.data.dto.catalogue.ImageDTO.ImageUploadResult;
+import static com.singhtwenty2.ssew_core.data.dto.catalogue.ImageDTO.ProcessedImageResult;
+import static com.singhtwenty2.ssew_core.data.dto.catalogue.PreSignedUrlDTO.PresignedUrlResponse;
 
 @Service
 @Slf4j
@@ -78,7 +78,7 @@ public class S3ServiceImpl implements S3Service {
     }
 
     @Override
-    public ImageUploadResult uploadBrandLogo(ProcessedImageResult processedImage, String brandSlug) {
+    public ImageUploadResult uploadManufacturerLogo(ProcessedImageResult processedImage, String brandSlug) {
         try {
             String objectKey = generateBrandLogoKey(brandSlug, processedImage.getFileExtension());
 

@@ -21,7 +21,7 @@ import java.util.Map;
                 @Index(name = "idx_product_sku", columnList = "sku", unique = true),
                 @Index(name = "idx_product_model_number", columnList = "model_number", unique = true),
                 @Index(name = "idx_product_slug", columnList = "slug", unique = true),
-                @Index(name = "idx_product_brand", columnList = "brand_id"),
+                @Index(name = "idx_product_manufacturer", columnList = "manufacturer_id"),
                 @Index(name = "idx_product_active", columnList = "is_active"),
                 @Index(name = "idx_product_parent", columnList = "parent_product_id"),
                 @Index(name = "idx_product_variant_type", columnList = "variant_type"),
@@ -103,8 +103,8 @@ public class Product extends BaseEntity {
     private Integer thumbnailHeight;
 
     @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "brand_id", nullable = false)
-    private Brand brand;
+    @JoinColumn(name = "manufacturer_id", nullable = false)
+    private Manufacturer manufacturer;
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "parent_product_id")
@@ -122,6 +122,18 @@ public class Product extends BaseEntity {
 
     @OneToMany(mappedBy = "product", cascade = CascadeType.ALL, fetch = FetchType.LAZY, orphanRemoval = true)
     private List<ProductImage> productImages = new ArrayList<>();
+
+    @ManyToMany(cascade = {CascadeType.PERSIST, CascadeType.MERGE}, fetch = FetchType.LAZY)
+    @JoinTable(
+            name = "product_compatibility_brands",
+            joinColumns = @JoinColumn(name = "product_id"),
+            inverseJoinColumns = @JoinColumn(name = "compatibility_brand_id"),
+            indexes = {
+                    @Index(name = "idx_product_compatibility_product", columnList = "product_id"),
+                    @Index(name = "idx_product_compatibility_brand", columnList = "compatibility_brand_id")
+            }
+    )
+    private List<CompatibilityBrand> compatibilityBrands = new ArrayList<>();
 
     public void addVariant(Product variant) {
         variants.add(variant);
@@ -159,6 +171,24 @@ public class Product extends BaseEntity {
         reorderImagePositions();
     }
 
+    public void addCompatibilityBrand(CompatibilityBrand compatibilityBrand) {
+        if (!compatibilityBrands.contains(compatibilityBrand)) {
+            compatibilityBrands.add(compatibilityBrand);
+            compatibilityBrand.getProducts().add(this);
+        }
+    }
+
+    public void removeCompatibilityBrand(CompatibilityBrand compatibilityBrand) {
+        compatibilityBrands.remove(compatibilityBrand);
+        compatibilityBrand.getProducts().remove(this);
+    }
+
+    public void clearCompatibilityBrands() {
+        for (CompatibilityBrand compatibilityBrand : new ArrayList<>(compatibilityBrands)) {
+            removeCompatibilityBrand(compatibilityBrand);
+        }
+    }
+
     private void reorderVariantPositions() {
         for (int i = 0; i < variants.size(); i++) {
             variants.get(i).setVariantPosition(i + 1);
@@ -191,15 +221,23 @@ public class Product extends BaseEntity {
         return parentProduct != null ? parentProduct.getVariants() : this.getVariants();
     }
 
-    public String getCategoryId() {
-        return brand != null && brand.getCategory() != null ? brand.getCategory().getId().toString() : null;
+    public List<String> getCategoryIds() {
+        return manufacturer != null ?
+                manufacturer.getCategories().stream()
+                        .map(category -> category.getId().toString())
+                        .toList() :
+                new ArrayList<>();
     }
 
-    public String getCategoryName() {
-        return brand != null && brand.getCategory() != null ? brand.getCategory().getName() : null;
+    public List<String> getCategoryNames() {
+        return manufacturer != null ?
+                manufacturer.getCategories().stream()
+                        .map(Category::getName)
+                        .toList() :
+                new ArrayList<>();
     }
 
-    public String getBrandName() {
-        return brand != null ? brand.getName() : null;
+    public String getManufacturerName() {
+        return manufacturer != null ? manufacturer.getName() : null;
     }
 }

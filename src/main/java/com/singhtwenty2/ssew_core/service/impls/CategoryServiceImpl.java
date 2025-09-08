@@ -2,7 +2,7 @@ package com.singhtwenty2.ssew_core.service.impls;
 
 import com.singhtwenty2.ssew_core.data.entity.Category;
 import com.singhtwenty2.ssew_core.data.repository.CategoryRepository;
-import com.singhtwenty2.ssew_core.service.CategoryService;
+import com.singhtwenty2.ssew_core.service.catalogue.CategoryService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.Page;
@@ -19,7 +19,7 @@ import java.util.Optional;
 import java.util.UUID;
 import java.util.stream.Collectors;
 
-import static com.singhtwenty2.ssew_core.data.dto.catalog_management.CategoryDTO.*;
+import static com.singhtwenty2.ssew_core.data.dto.catalogue.CategoryDTO.*;
 
 @Service
 @Slf4j
@@ -169,11 +169,11 @@ public class CategoryServiceImpl implements CategoryService {
 
         Category category = findCategoryById(categoryId);
 
-        Long brandCount = categoryRepository.countBrandsByCategoryId(category.getId());
-        if (brandCount > 0) {
+        Long manufacturerCount = categoryRepository.countManufacturersByCategoryId(category.getId());
+        if (manufacturerCount > 0) {
             throw new ResponseStatusException(
                     HttpStatus.CONFLICT,
-                    "Cannot delete category. It has " + brandCount + " associated brands"
+                    "Cannot delete category. It has " + manufacturerCount + " associated manufacturers"
             );
         }
 
@@ -183,29 +183,16 @@ public class CategoryServiceImpl implements CategoryService {
     }
 
     @Override
-    public void activateCategory(String categoryId) {
-        log.debug("Activating category with ID: {}", categoryId);
+    public void toggleCategoryStatus(String categoryId) {
+        log.debug("Toggling category status with ID: {}", categoryId);
 
         Category category = findCategoryById(categoryId);
-        category.setIsActive(true);
+        category.setIsActive(!category.getIsActive());
         category.setUpdatedAt(LocalDateTime.now());
 
         categoryRepository.save(category);
 
-        log.info("Category activated successfully with ID: {}", categoryId);
-    }
-
-    @Override
-    public void deactivateCategory(String categoryId) {
-        log.debug("Deactivating category with ID: {}", categoryId);
-
-        Category category = findCategoryById(categoryId);
-        category.setIsActive(false);
-        category.setUpdatedAt(LocalDateTime.now());
-
-        categoryRepository.save(category);
-
-        log.info("Category deactivated successfully with ID: {}", categoryId);
+        log.info("Category status toggled successfully with ID: {} - New status: {}", categoryId, category.getIsActive());
     }
 
     private void validateCreateRequest(CreateCategoryRequest request) {
@@ -250,7 +237,7 @@ public class CategoryServiceImpl implements CategoryService {
     }
 
     private CategoryResponse buildCategoryResponse(Category category) {
-        Long brandCount = categoryRepository.countBrandsByCategoryId(category.getId());
+        Long manufacturerCount = categoryRepository.countManufacturersByCategoryId(category.getId());
 
         return CategoryResponse.builder()
                 .categoryId(category.getId().toString())
@@ -263,7 +250,7 @@ public class CategoryServiceImpl implements CategoryService {
                 .metaDescription(category.getMetaDescription())
                 .createdAt(category.getCreatedAt().toString())
                 .updatedAt(category.getUpdatedAt().toString())
-                .brandCount(brandCount)
+                .manufacturerCount(manufacturerCount)
                 .build();
     }
 

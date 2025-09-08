@@ -1,7 +1,7 @@
 package com.singhtwenty2.ssew_core.security;
 
 import com.singhtwenty2.ssew_core.data.enums.UserRole;
-import com.singhtwenty2.ssew_core.service.JwtService;
+import com.singhtwenty2.ssew_core.service.aux.JwtService;
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;

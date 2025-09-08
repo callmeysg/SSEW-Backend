@@ -11,7 +11,7 @@ import com.singhtwenty2.ssew_core.data.repository.ProductRepository;
 import com.singhtwenty2.ssew_core.data.repository.UserRepository;
 import com.singhtwenty2.ssew_core.exception.BusinessException;
 import com.singhtwenty2.ssew_core.exception.ResourceNotFoundException;
-import com.singhtwenty2.ssew_core.service.CartService;
+import com.singhtwenty2.ssew_core.service.catalogue.CartService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.scheduling.annotation.Scheduled;
@@ -25,7 +25,7 @@ import java.util.Optional;
 import java.util.UUID;
 import java.util.stream.Collectors;
 
-import static com.singhtwenty2.ssew_core.data.dto.cart_management.CartDTO.*;
+import static com.singhtwenty2.ssew_core.data.dto.cart.CartDTO.*;
 
 @Service
 @RequiredArgsConstructor
@@ -344,7 +344,7 @@ public class CartServiceImpl implements CartService {
                 .productName(product.getName())
                 .productSlug(product.getSlug())
                 .productSku(product.getSku())
-                .brandName(product.getBrandName())
+                .manufacturerName(product.getManufacturerName())
                 .thumbnailUrl(product.getThumbnailObjectKey())
                 .quantity(cartItem.getQuantity())
                 .unitPrice(cartItem.getPriceAtTime())

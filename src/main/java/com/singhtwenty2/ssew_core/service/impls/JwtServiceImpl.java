@@ -1,7 +1,7 @@
 package com.singhtwenty2.ssew_core.service.impls;
 
 import com.singhtwenty2.ssew_core.data.enums.UserRole;
-import com.singhtwenty2.ssew_core.service.JwtService;
+import com.singhtwenty2.ssew_core.service.aux.JwtService;
 import io.jsonwebtoken.Claims;
 import io.jsonwebtoken.ExpiredJwtException;
 import io.jsonwebtoken.JwtException;

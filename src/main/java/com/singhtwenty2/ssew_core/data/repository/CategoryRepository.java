@@ -41,8 +41,17 @@ public interface CategoryRepository extends JpaRepository<Category, UUID> {
             Pageable pageable
     );
 
-    @Query("SELECT COUNT(b) FROM Brand b WHERE b.category.id = :categoryId")
-    Long countBrandsByCategoryId(@Param("categoryId") UUID categoryId);
+    @Query("SELECT COUNT(DISTINCT m) FROM Manufacturer m JOIN m.categories c WHERE c.id = :categoryId")
+    Long countManufacturersByCategoryId(@Param("categoryId") UUID categoryId);
 
     Optional<Category> findTopByOrderByDisplayOrderDesc();
+
+    @Query("SELECT c FROM Category c JOIN FETCH c.manufacturers WHERE c.id = :categoryId")
+    Optional<Category> findByIdWithManufacturers(@Param("categoryId") UUID categoryId);
+
+    @Query("SELECT c FROM Category c JOIN FETCH c.manufacturers m WHERE c.isActive = :isActive ORDER BY c.displayOrder ASC")
+    List<Category> findByIsActiveWithManufacturers(@Param("isActive") Boolean isActive);
+
+    @Query("SELECT DISTINCT c FROM Category c JOIN c.manufacturers m WHERE m.id = :manufacturerId")
+    List<Category> findCategoriesByManufacturerId(@Param("manufacturerId") UUID manufacturerId);
 }
