@@ -1,0 +1,40 @@
+/**
+ * Copyright 2025 SSEW Core Service
+ * Developer: Aryan Singh (@singhtwenty2)
+ * Portfolio: https://singhtwenty2.pages.dev/
+ * This file is part of SSEW E-commerce Backend System
+ * Licensed under MIT License
+ * For commercial use and inquiries: aryansingh.corp@gmail.com
+ * @author Aryan Singh (@singhtwenty2)
+ * @project SSEW E-commerce Backend System
+ * @since 2025
+ */
+package com.singhtwenty2.ssew_core.util.io;
+
+import com.singhtwenty2.ssew_core.security.PrincipalUser;
+import jakarta.servlet.http.HttpServletRequest;
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.security.core.Authentication;
+
+import static com.singhtwenty2.ssew_core.util.io.NetworkUtils.getClientIP;
+
+@Slf4j
+public class AuthenticationUtils {
+
+    private AuthenticationUtils() {
+        throw new IllegalStateException("Utility class");
+    }
+
+    public static PrincipalUser validateAuthentication(Authentication authentication, HttpServletRequest request, String operation) {
+        if (authentication == null || !(authentication.getPrincipal() instanceof PrincipalUser principalUser)) {
+            log.warn("Unauthorized {} attempt from IP: {}", operation, getClientIP(request));
+            return null;
+        }
+        return principalUser;
+    }
+
+    public static String extractUserId(Authentication authentication, HttpServletRequest request, String operation) {
+        PrincipalUser principalUser = validateAuthentication(authentication, request, operation);
+        return principalUser != null ? principalUser.getUserId().toString() : null;
+    }
+}

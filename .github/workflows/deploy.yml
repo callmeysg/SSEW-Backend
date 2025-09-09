@@ -39,6 +39,21 @@ jobs:
           key: ${{ runner.os }}-m2-${{ hashFiles('**/pom.xml') }}
           restore-keys: ${{ runner.os }}-m2
 
+      # NEW: Validate license headers before building
+      - name: Validate code attribution headers
+        run: |
+          echo "🔍 Validating code attribution headers..."
+          mvn license:check -q
+          if [ $? -eq 0 ]; then
+            echo "✅ All Java files have proper attribution headers!"
+          else
+            echo "❌ Some files are missing proper attribution headers!"
+            echo "💡 Run 'mvn license:format' locally to add missing headers"
+            echo "📋 Files without headers:"
+            mvn license:check 2>&1 | grep -E "Missing header|File:" || true
+            exit 1
+          fi
+
       - name: Build with Maven
         run: mvn clean package -DskipTests
 
@@ -169,6 +184,8 @@ jobs:
             
             if [ "$FRESH_DEPLOY" = "true" ]; then
               echo "🎉 Fresh deployment completed!"
+              echo "📄 Code attribution: All files properly attributed to Aryan Singh (@singhtwenty2)"
             else
               echo "🎉 Incremental deployment completed!"
+              echo "📄 Code attribution: All files properly attributed to Aryan Singh (@singhtwenty2)"
             fi

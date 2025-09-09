@@ -1,4 +1,17 @@
 <?xml version="1.0" encoding="UTF-8"?>
+<!--
+
+    Copyright 2025 SSEW Core Service
+    Developer: Aryan Singh (@singhtwenty2)
+    Portfolio: https://singhtwenty2.pages.dev/
+    This file is part of SSEW E-commerce Backend System
+    Licensed under MIT License
+    For commercial use and inquiries: aryansingh.corp@gmail.com
+    @author Aryan Singh (@singhtwenty2)
+    @project SSEW E-commerce Backend System
+    @since 2025
+
+-->
 <project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
          xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
     <modelVersion>4.0.0</modelVersion>
@@ -13,21 +26,36 @@
     <version>0.0.1-SNAPSHOT</version>
     <name>ssew-core</name>
     <description>Core Service For SSEW</description>
-    <url/>
+    <url>https://singhtwenty2.pages.dev/</url>
     <licenses>
-        <license/>
+        <license>
+            <name>MIT License</name>
+            <url>https://opensource.org/licenses/MIT</url>
+            <distribution>repo</distribution>
+        </license>
     </licenses>
     <developers>
-        <developer/>
+        <developer>
+            <id>singhtwenty2</id>
+            <name>Aryan Singh</name>
+            <email>aryansingh.developer@gmail.com</email>
+            <url>https://singhtwenty2.pages.dev/</url>
+            <roles>
+                <role>Backend Developer</role>
+            </roles>
+        </developer>
     </developers>
     <scm>
-        <connection/>
-        <developerConnection/>
-        <tag/>
-        <url/>
+        <connection>scm:git:git://github.com/callmeysg/SSEW-Backend-Core-Service.git</connection>
+        <developerConnection>scm:git:ssh://github.com/callmeysg/SSEW-Backend-Core-Service.git</developerConnection>
+        <tag>HEAD</tag>
+        <url>https://github.com/callmeysg/SSEW-Backend-Core-Service</url>
     </scm>
     <properties>
         <java.version>21</java.version>
+        <!-- License Plugin Properties -->
+        <license.header>src/main/resources/license-header.txt</license.header>
+        <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
     </properties>
     <dependencies>
         <dependency>
@@ -157,6 +185,61 @@
                 <groupId>org.springframework.boot</groupId>
                 <artifactId>spring-boot-maven-plugin</artifactId>
             </plugin>
+
+            <!-- License Maven Plugin for Code Attribution -->
+            <plugin>
+                <groupId>com.mycila</groupId>
+                <artifactId>license-maven-plugin</artifactId>
+                <version>4.5</version>
+                <configuration>
+                    <properties>
+                        <owner>SSEW Core Service</owner>
+                        <year>2025</year>
+                        <developer>Aryan Singh (@singhtwenty2)</developer>
+                        <portfolio>https://singhtwenty2.pages.dev/</portfolio>
+                        <project>SSEW E-commerce Backend System</project>
+                    </properties>
+                    <licenseSets>
+                        <licenseSet>
+                            <header>src/main/resources/license-header.txt</header>
+                            <includes>
+                                <include>src/main/java/**/*.java</include>
+                            </includes>
+                            <excludes>
+                                <exclude>**/README</exclude>
+                                <exclude>**/LICENSE</exclude>
+                                <exclude>**/.gitignore</exclude>
+                                <exclude>src/test/resources/**</exclude>
+                                <exclude>src/main/resources/**/*.properties</exclude>
+                                <exclude>src/main/resources/**/*.yml</exclude>
+                                <exclude>src/main/resources/**/*.yaml</exclude>
+                                <exclude>src/main/resources/**/*.xml</exclude>
+                                <exclude>src/main/resources/**/*.json</exclude>
+                                <exclude>**/*.md</exclude>
+                                <exclude>**/*.txt</exclude>
+                                <exclude>**/target/**</exclude>
+                                <exclude>**/.mvn/**</exclude>
+                                <exclude>**/mvnw</exclude>
+                                <exclude>**/mvnw.cmd</exclude>
+                            </excludes>
+                        </licenseSet>
+                    </licenseSets>
+                    <mapping>
+                        <java>JAVADOC_STYLE</java>
+                    </mapping>
+                    <strictCheck>true</strictCheck>
+                    <failIfMissing>true</failIfMissing>
+                    <encoding>UTF-8</encoding>
+                </configuration>
+                <executions>
+                    <execution>
+                        <goals>
+                            <goal>check</goal>
+                        </goals>
+                        <phase>validate</phase>
+                    </execution>
+                </executions>
+            </plugin>
         </plugins>
     </build>
 
@@ -188,6 +271,27 @@
                                     -->
                                     <goal>uploadSourceBundle</goal>
                                 </goals>
+                            </execution>
+                        </executions>
+                    </plugin>
+                </plugins>
+            </build>
+        </profile>
+
+        <!-- Profile for License Management -->
+        <profile>
+            <id>license</id>
+            <build>
+                <plugins>
+                    <plugin>
+                        <groupId>com.mycila</groupId>
+                        <artifactId>license-maven-plugin</artifactId>
+                        <executions>
+                            <execution>
+                                <goals>
+                                    <goal>format</goal>
+                                </goals>
+                                <phase>process-sources</phase>
                             </execution>
                         </executions>
                     </plugin>

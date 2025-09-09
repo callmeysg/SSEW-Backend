@@ -1,0 +1,9 @@
+Copyright ${year} ${owner}
+Developer: ${developer}
+Portfolio: ${portfolio}
+This file is part of ${project}
+Licensed under MIT License
+For commercial use and inquiries: aryansingh.corp@gmail.com
+@author ${developer}
+@project ${project}
+@since ${year}

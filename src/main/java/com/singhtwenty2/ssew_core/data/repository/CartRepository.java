@@ -1,3 +1,14 @@
+/**
+ * Copyright 2025 SSEW Core Service
+ * Developer: Aryan Singh (@singhtwenty2)
+ * Portfolio: https://singhtwenty2.pages.dev/
+ * This file is part of SSEW E-commerce Backend System
+ * Licensed under MIT License
+ * For commercial use and inquiries: aryansingh.corp@gmail.com
+ * @author Aryan Singh (@singhtwenty2)
+ * @project SSEW E-commerce Backend System
+ * @since 2025
+ */
 package com.singhtwenty2.ssew_core.data.repository;
 
 import com.singhtwenty2.ssew_core.data.entity.Cart;
@@ -30,4 +41,8 @@ public interface CartRepository extends JpaRepository<Cart, UUID> {
 
     @Query("SELECT c FROM Cart c WHERE c.updatedAt < :cutoffDate AND c.isActive = true")
     List<Cart> findInactiveCartsOlderThan(@Param("cutoffDate") LocalDateTime cutoffDate);
+
+    Optional<Cart> findByIdAndUserIdAndCartTypeAndIsActiveTrue(UUID cartId, UUID userId, CartType cartType);
+
+    Optional<Cart> findByUserIdAndCartTypeAndIsActiveTrue(UUID userId, CartType cartType);
 }

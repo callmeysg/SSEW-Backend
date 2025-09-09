@@ -1,9 +1,20 @@
+/**
+ * Copyright 2025 SSEW Core Service
+ * Developer: Aryan Singh (@singhtwenty2)
+ * Portfolio: https://singhtwenty2.pages.dev/
+ * This file is part of SSEW E-commerce Backend System
+ * Licensed under MIT License
+ * For commercial use and inquiries: aryansingh.corp@gmail.com
+ * @author Aryan Singh (@singhtwenty2)
+ * @project SSEW E-commerce Backend System
+ * @since 2025
+ */
 package com.singhtwenty2.ssew_core.controller.catalogue;
 
 import com.singhtwenty2.ssew_core.data.dto.common.GlobalApiResponse;
 import com.singhtwenty2.ssew_core.data.enums.CartType;
-import com.singhtwenty2.ssew_core.security.PrincipalUser;
 import com.singhtwenty2.ssew_core.service.catalogue.CartService;
+import com.singhtwenty2.ssew_core.util.io.AuthenticationUtils;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
@@ -34,8 +45,8 @@ public class CartController {
             Authentication authentication,
             HttpServletRequest httpRequest
     ) {
-        PrincipalUser principalUser = validateAuthentication(authentication, httpRequest, "add item to cart");
-        if (principalUser == null) {
+        String userId = AuthenticationUtils.extractUserId(authentication, httpRequest, "add item to cart");
+        if (userId == null) {
             return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(
                     GlobalApiResponse.<CartResponse>builder()
                             .success(false)
@@ -45,9 +56,8 @@ public class CartController {
         }
 
         log.info("Add item to cart request from IP: {} for user: {}, cartType: {}",
-                getClientIP(httpRequest), principalUser.getUserId(), request.getCartType());
+                getClientIP(httpRequest), userId, request.getCartType());
 
-        String userId = principalUser.getUserId().toString();
         CartResponse response = cartService.addItemToCart(userId, request);
 
         String message = request.getCartType() == CartType.CART ?
@@ -70,8 +80,8 @@ public class CartController {
             Authentication authentication,
             HttpServletRequest httpRequest
     ) {
-        PrincipalUser principalUser = validateAuthentication(authentication, httpRequest, "update cart item");
-        if (principalUser == null) {
+        String userId = AuthenticationUtils.extractUserId(authentication, httpRequest, "update cart item");
+        if (userId == null) {
             return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(
                     GlobalApiResponse.<CartResponse>builder()
                             .success(false)
@@ -81,9 +91,8 @@ public class CartController {
         }
 
         log.info("Update cart item quantity request from IP: {} for user: {}, itemId: {}",
-                getClientIP(httpRequest), principalUser.getUserId(), cartItemId);
+                getClientIP(httpRequest), userId, cartItemId);
 
-        String userId = principalUser.getUserId().toString();
         CartResponse response = cartService.updateCartItemQuantity(userId, cartItemId, request);
 
         return ResponseEntity.ok(
@@ -103,8 +112,8 @@ public class CartController {
             Authentication authentication,
             HttpServletRequest httpRequest
     ) {
-        PrincipalUser principalUser = validateAuthentication(authentication, httpRequest, "remove item from cart");
-        if (principalUser == null) {
+        String userId = AuthenticationUtils.extractUserId(authentication, httpRequest, "remove item from cart");
+        if (userId == null) {
             return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(
                     GlobalApiResponse.<CartResponse>builder()
                             .success(false)
@@ -114,9 +123,8 @@ public class CartController {
         }
 
         log.info("Remove item from cart request from IP: {} for user: {}, itemId: {}, cartType: {}",
-                getClientIP(httpRequest), principalUser.getUserId(), cartItemId, cartType);
+                getClientIP(httpRequest), userId, cartItemId, cartType);
 
-        String userId = principalUser.getUserId().toString();
         CartResponse response = cartService.removeItemFromCart(userId, cartItemId, cartType);
 
         String message = cartType == CartType.CART ?
@@ -139,8 +147,8 @@ public class CartController {
             Authentication authentication,
             HttpServletRequest httpRequest
     ) {
-        PrincipalUser principalUser = validateAuthentication(authentication, httpRequest, "move item between carts");
-        if (principalUser == null) {
+        String userId = AuthenticationUtils.extractUserId(authentication, httpRequest, "move item between carts");
+        if (userId == null) {
             return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(
                     GlobalApiResponse.<CartResponse>builder()
                             .success(false)
@@ -150,9 +158,8 @@ public class CartController {
         }
 
         log.info("Move item between carts request from IP: {} for user: {}, itemId: {}, targetType: {}",
-                getClientIP(httpRequest), principalUser.getUserId(), cartItemId, request.getTargetCartType());
+                getClientIP(httpRequest), userId, cartItemId, request.getTargetCartType());
 
-        String userId = principalUser.getUserId().toString();
         CartResponse response = cartService.moveItemBetweenCarts(userId, cartItemId, request);
 
         String message = request.getTargetCartType() == CartType.CART ?
@@ -174,8 +181,8 @@ public class CartController {
             Authentication authentication,
             HttpServletRequest httpRequest
     ) {
-        PrincipalUser principalUser = validateAuthentication(authentication, httpRequest, "get cart");
-        if (principalUser == null) {
+        String userId = AuthenticationUtils.extractUserId(authentication, httpRequest, "get cart");
+        if (userId == null) {
             return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(
                     GlobalApiResponse.<CartResponse>builder()
                             .success(false)
@@ -185,9 +192,8 @@ public class CartController {
         }
 
         log.debug("Get cart request from IP: {} for user: {}, cartType: {}",
-                getClientIP(httpRequest), principalUser.getUserId(), cartType);
+                getClientIP(httpRequest), userId, cartType);
 
-        String userId = principalUser.getUserId().toString();
         CartResponse response = cartService.getCart(userId, cartType);
 
         String message = cartType == CartType.CART ?
@@ -208,8 +214,8 @@ public class CartController {
             Authentication authentication,
             HttpServletRequest httpRequest
     ) {
-        PrincipalUser principalUser = validateAuthentication(authentication, httpRequest, "get cart summaries");
-        if (principalUser == null) {
+        String userId = AuthenticationUtils.extractUserId(authentication, httpRequest, "get cart summaries");
+        if (userId == null) {
             return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(
                     GlobalApiResponse.<List<CartSummary>>builder()
                             .success(false)
@@ -219,9 +225,8 @@ public class CartController {
         }
 
         log.debug("Get all cart summaries request from IP: {} for user: {}",
-                getClientIP(httpRequest), principalUser.getUserId());
+                getClientIP(httpRequest), userId);
 
-        String userId = principalUser.getUserId().toString();
         List<CartSummary> response = cartService.getAllCartSummaries(userId);
 
         return ResponseEntity.ok(
@@ -240,8 +245,8 @@ public class CartController {
             Authentication authentication,
             HttpServletRequest httpRequest
     ) {
-        PrincipalUser principalUser = validateAuthentication(authentication, httpRequest, "clear cart");
-        if (principalUser == null) {
+        String userId = AuthenticationUtils.extractUserId(authentication, httpRequest, "clear cart");
+        if (userId == null) {
             return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(
                     GlobalApiResponse.<CartResponse>builder()
                             .success(false)
@@ -251,9 +256,8 @@ public class CartController {
         }
 
         log.info("Clear cart request from IP: {} for user: {}, cartType: {}",
-                getClientIP(httpRequest), principalUser.getUserId(), cartType);
+                getClientIP(httpRequest), userId, cartType);
 
-        String userId = principalUser.getUserId().toString();
         CartResponse response = cartService.clearCart(userId, cartType);
 
         String message = cartType == CartType.CART ?
@@ -275,8 +279,8 @@ public class CartController {
             Authentication authentication,
             HttpServletRequest httpRequest
     ) {
-        PrincipalUser principalUser = validateAuthentication(authentication, httpRequest, "sync cart prices");
-        if (principalUser == null) {
+        String userId = AuthenticationUtils.extractUserId(authentication, httpRequest, "sync cart prices");
+        if (userId == null) {
             return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(
                     GlobalApiResponse.<Void>builder()
                             .success(false)
@@ -286,9 +290,8 @@ public class CartController {
         }
 
         log.info("Sync cart prices request from IP: {} for user: {}, cartType: {}",
-                getClientIP(httpRequest), principalUser.getUserId(), cartType);
+                getClientIP(httpRequest), userId, cartType);
 
-        String userId = principalUser.getUserId().toString();
         String message = cartService.syncCartWithProductPrices(userId, cartType);
 
         return ResponseEntity.ok(
@@ -297,13 +300,5 @@ public class CartController {
                         .message(message)
                         .build()
         );
-    }
-
-    private PrincipalUser validateAuthentication(Authentication authentication, HttpServletRequest request, String operation) {
-        if (authentication == null || !(authentication.getPrincipal() instanceof PrincipalUser principalUser)) {
-            log.warn("Unauthorized {} attempt from IP: {}", operation, getClientIP(request));
-            return null;
-        }
-        return principalUser;
     }
 }
