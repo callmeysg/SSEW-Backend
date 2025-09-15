@@ -65,10 +65,13 @@ public class CartServiceImpl implements CartService {
                 cart.getId(), product.getId());
 
         if (existingItem.isPresent()) {
-            CartItem cartItem = existingItem.get();
             if (request.getCartType() == CartType.WISHLIST) {
-                throw new BusinessException("Item already exists in wishlist");
+                log.info("Item already exists in wishlist");
+                CartResponse response = mapCartToResponse(cart);
+                response.setItemAlreadyExists(true);
+                return response;
             }
+            CartItem cartItem = existingItem.get();
             cartItem.increaseQuantity(request.getQuantity());
             cartItem = cartItemRepository.save(cartItem);
             log.info("Updated existing cart item quantity to: {}", cartItem.getQuantity());
@@ -84,7 +87,9 @@ public class CartServiceImpl implements CartService {
             log.info("Added new item to cart");
         }
 
-        return mapCartToResponse(cart);
+        CartResponse response = mapCartToResponse(cart);
+        response.setItemAlreadyExists(false);
+        return response;
     }
 
     @Override
@@ -155,23 +160,33 @@ public class CartServiceImpl implements CartService {
                 targetCart.getId(), product.getId());
 
         if (existingTargetItem.isPresent()) {
-            throw new BusinessException("Item already exists in target cart");
+            if (request.getTargetCartType() == CartType.CART) {
+                CartItem targetItem = existingTargetItem.get();
+                targetItem.increaseQuantity(1);
+                cartItemRepository.save(targetItem);
+                log.info("Item already exists in target cart, increased quantity");
+            } else {
+                throw new BusinessException("Item already exists in target cart");
+            }
+        } else {
+            CartItem newItem = new CartItem();
+            newItem.setCart(targetCart);
+            newItem.setProduct(product);
+            newItem.setQuantity(request.getTargetCartType() == CartType.WISHLIST ? 1 : 1);
+            newItem.setPriceAtTime(product.getPrice());
+
+            targetCart.addCartItem(newItem);
+            cartRepository.save(targetCart);
         }
 
-        Cart sourceCart = sourceItem.getCart();
-        sourceCart.removeCartItem(sourceItem);
-        cartItemRepository.delete(sourceItem);
-        cartRepository.save(sourceCart);
+        if (sourceType == CartType.CART) {
+            Cart sourceCart = sourceItem.getCart();
+            sourceCart.removeCartItem(sourceItem);
+            cartItemRepository.delete(sourceItem);
+            cartRepository.save(sourceCart);
+        }
 
-        CartItem newItem = new CartItem();
-        newItem.setCart(targetCart);
-        newItem.setProduct(product);
-        newItem.setQuantity(request.getTargetCartType() == CartType.WISHLIST ? 1 : sourceItem.getQuantity());
-        newItem.setPriceAtTime(product.getPrice());
-
-        targetCart.addCartItem(newItem);
-        Cart savedTargetCart = cartRepository.save(targetCart);
-
+        Cart savedTargetCart = cartRepository.findById(targetCart.getId()).orElse(targetCart);
         log.info("Successfully moved item from {} to {}", sourceType, request.getTargetCartType());
         return mapCartToResponse(savedTargetCart);
     }
@@ -221,12 +236,6 @@ public class CartServiceImpl implements CartService {
         log.info("Cart cleared successfully");
 
         return mapCartToResponse(cart);
-    }
-
-    @Override
-    @Transactional
-    public void mergeGuestCartToUserCart(String guestSessionId, String userId) {
-        log.info("Merging guest cart to user cart - GuestId: {}, UserId: {}", guestSessionId, userId);
     }
 
     @Override
@@ -321,6 +330,7 @@ public class CartServiceImpl implements CartService {
                 .totalAmount(BigDecimal.ZERO)
                 .items(List.of())
                 .lastUpdated(LocalDateTime.now())
+                .itemAlreadyExists(false)
                 .build();
     }
 
@@ -343,6 +353,7 @@ public class CartServiceImpl implements CartService {
                 .totalAmount(totalAmount)
                 .items(items)
                 .lastUpdated(cart.getUpdatedAt())
+                .itemAlreadyExists(false)
                 .build();
     }
 

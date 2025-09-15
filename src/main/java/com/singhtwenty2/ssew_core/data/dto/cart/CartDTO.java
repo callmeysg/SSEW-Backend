@@ -33,12 +33,18 @@ public class CartDTO {
         @NotBlank(message = "Product ID is required")
         private String productId;
 
-        @NotNull(message = "Quantity is required")
         @Min(value = 1, message = "Quantity must be at least 1")
         private Integer quantity;
 
         @NotNull(message = "Cart type is required")
         private CartType cartType;
+
+        public Integer getQuantity() {
+            if (cartType == CartType.WISHLIST) {
+                return 1;
+            }
+            return quantity != null ? quantity : 1;
+        }
     }
 
     @Setter
@@ -99,6 +105,7 @@ public class CartDTO {
         private BigDecimal totalAmount;
         private List<CartItemResponse> items;
         private LocalDateTime lastUpdated;
+        private Boolean itemAlreadyExists;
     }
 
     @Setter

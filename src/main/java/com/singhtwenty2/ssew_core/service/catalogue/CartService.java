@@ -34,7 +34,5 @@ public interface CartService {
 
     CartResponse clearCart(String userId, CartType cartType);
 
-    void mergeGuestCartToUserCart(String guestSessionId, String userId);
-
     String syncCartWithProductPrices(String userId, CartType cartType);
 }

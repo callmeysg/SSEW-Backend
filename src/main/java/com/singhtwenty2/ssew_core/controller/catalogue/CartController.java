@@ -60,6 +60,17 @@ public class CartController {
 
         CartResponse response = cartService.addItemToCart(userId, request);
 
+        if (response.getItemAlreadyExists() != null && response.getItemAlreadyExists()) {
+            String message = "Item already exists in wishlist";
+            return ResponseEntity.ok(
+                    GlobalApiResponse.<CartResponse>builder()
+                            .success(true)
+                            .message(message)
+                            .data(response)
+                            .build()
+            );
+        }
+
         String message = request.getCartType() == CartType.CART ?
                 "Item added to cart successfully" : "Item added to wishlist successfully";
 
