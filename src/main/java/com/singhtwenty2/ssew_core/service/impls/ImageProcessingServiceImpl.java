@@ -12,6 +12,7 @@
 package com.singhtwenty2.ssew_core.service.impls;
 
 import com.singhtwenty2.ssew_core.service.file_handeling.ImageProcessingService;
+import com.singhtwenty2.ssew_core.service.file_handeling.WatermarkService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpStatus;
@@ -40,6 +41,8 @@ import static com.singhtwenty2.ssew_core.data.dto.catalogue.ImageDTO.*;
 @RequiredArgsConstructor
 public class ImageProcessingServiceImpl implements ImageProcessingService {
 
+    private final WatermarkService watermarkService;
+
     private static final String[] SUPPORTED_FORMATS = {"jpg", "jpeg", "png", "webp", "gif", "bmp"};
     private static final long MAX_FILE_SIZE = 10 * 1024 * 1024;
     private static final int MIN_DIMENSION = 50;
@@ -47,6 +50,11 @@ public class ImageProcessingServiceImpl implements ImageProcessingService {
 
     @Override
     public ProcessedImageResult processImage(MultipartFile file, ImageProcessingConfig config) {
+        return processImage(file, config, null);
+    }
+
+    @Override
+    public ProcessedImageResult processImage(MultipartFile file, ImageProcessingConfig config, String watermarkText) {
         validateImageFile(file);
 
         try {
@@ -66,6 +74,11 @@ public class ImageProcessingServiceImpl implements ImageProcessingService {
                     .build();
 
             BufferedImage processedImage = resizeImageGracefully(originalImage, config);
+
+            if (watermarkText != null && !watermarkText.trim().isEmpty()) {
+                processedImage = watermarkService.applyWatermark(processedImage, watermarkText);
+                log.debug("Applied watermark to image: {}", watermarkText);
+            }
 
             byte[] imageData = compressImageWithBetterQuality(processedImage, config);
             String contentType = "image/" + config.getOutputFormat();
@@ -90,15 +103,20 @@ public class ImageProcessingServiceImpl implements ImageProcessingService {
 
     @Override
     public ProcessedImageResult processManufacturerLogo(MultipartFile file) {
-        return processImage(file, ImageProcessingConfig.brandLogo());
+        return processImage(file, ImageProcessingConfig.brandLogo(), null);
     }
 
     @Override
     public ProcessedImageResult processProductImage(MultipartFile file, boolean isThumbnail) {
+        return processProductImage(file, isThumbnail, null);
+    }
+
+    @Override
+    public ProcessedImageResult processProductImage(MultipartFile file, boolean isThumbnail, String watermarkText) {
         ImageProcessingConfig config = isThumbnail ?
                 ImageProcessingConfig.productThumbnail() :
                 ImageProcessingConfig.productCatalog();
-        return processImage(file, config);
+        return processImage(file, config, watermarkText);
     }
 
     @Override
@@ -196,9 +214,6 @@ public class ImageProcessingServiceImpl implements ImageProcessingService {
         return new Dimension(newWidth, newHeight);
     }
 
-    /**
-     * Gracefully resize image instead of throwing errors for oversized images
-     */
     private BufferedImage resizeImageGracefully(BufferedImage originalImage, ImageProcessingConfig config) {
         int originalWidth = originalImage.getWidth();
         int originalHeight = originalImage.getHeight();
@@ -242,15 +257,10 @@ public class ImageProcessingServiceImpl implements ImageProcessingService {
         return resizedImage;
     }
 
-    /**
-     * Improved compression with better quality settings
-     */
     private byte[] compressImageWithBetterQuality(BufferedImage image, ImageProcessingConfig config) throws IOException {
         ByteArrayOutputStream byteArrayOutputStream = new ByteArrayOutputStream();
 
         if ("webp".equals(config.getOutputFormat())) {
-            // For WebP, we'll use PNG as fallback since Java doesn't natively support WebP writing
-            // In production. You might want to use a library like imageio-webp
             return compressToWebPFallback(image, config.getQuality());
         }
 
@@ -284,22 +294,14 @@ public class ImageProcessingServiceImpl implements ImageProcessingService {
         return result;
     }
 
-    /**
-     * Adjust quality based on output format for better results
-     */
     private float adjustQualityByFormat(String format, float requestedQuality) {
         return switch (format.toLowerCase()) {
             case "jpg", "jpeg" -> Math.max(0.8f, requestedQuality);
             case "png" -> 1.0f;
-            case "webp" -> Math.max(0.85f, requestedQuality);
             default -> Math.max(0.85f, requestedQuality);
         };
     }
 
-    /**
-     * Fallback method for WebP (using high-quality PNG instead)
-     * In production, considers using imageio-webp library for true WebP support
-     */
     private byte[] compressToWebPFallback(BufferedImage image, float quality) throws IOException {
         ByteArrayOutputStream byteArrayOutputStream = new ByteArrayOutputStream();
 

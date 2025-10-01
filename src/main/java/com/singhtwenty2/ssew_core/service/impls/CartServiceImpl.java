@@ -11,6 +11,8 @@
  */
 package com.singhtwenty2.ssew_core.service.impls;
 
+import com.singhtwenty2.ssew_core.data.dto.catalogue.PreSignedUrlDTO;
+import com.singhtwenty2.ssew_core.data.dto.catalogue.PreSignedUrlDTO.PresignedUrlResponse;
 import com.singhtwenty2.ssew_core.data.entity.Cart;
 import com.singhtwenty2.ssew_core.data.entity.CartItem;
 import com.singhtwenty2.ssew_core.data.entity.Product;
@@ -23,6 +25,7 @@ import com.singhtwenty2.ssew_core.data.repository.UserRepository;
 import com.singhtwenty2.ssew_core.exception.BusinessException;
 import com.singhtwenty2.ssew_core.exception.ResourceNotFoundException;
 import com.singhtwenty2.ssew_core.service.catalogue.CartService;
+import com.singhtwenty2.ssew_core.service.file_handeling.S3Service;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.scheduling.annotation.Scheduled;
@@ -48,6 +51,7 @@ public class CartServiceImpl implements CartService {
     private final CartItemRepository cartItemRepository;
     private final UserRepository userRepository;
     private final ProductRepository productRepository;
+    private final S3Service s3Service;
 
     @Override
     public CartResponse addItemToCart(String userId, AddItemRequest request) {
@@ -359,6 +363,8 @@ public class CartServiceImpl implements CartService {
 
     private CartItemResponse mapCartItemToResponse(CartItem cartItem) {
         Product product = cartItem.getProduct();
+        PresignedUrlResponse presignedUrlResponse = s3Service.generateReadPresignedUrl(
+                product.getThumbnailObjectKey(), 60);
 
         return CartItemResponse.builder()
                 .cartItemId(cartItem.getId().toString())
@@ -367,7 +373,7 @@ public class CartServiceImpl implements CartService {
                 .productSlug(product.getSlug())
                 .productSku(product.getSku())
                 .manufacturerName(product.getManufacturerName())
-                .thumbnailUrl(product.getThumbnailObjectKey())
+                .thumbnailUrl(presignedUrlResponse != null ? presignedUrlResponse.getPresignedUrl() : null)
                 .quantity(cartItem.getQuantity())
                 .unitPrice(cartItem.getPriceAtTime())
                 .totalPrice(cartItem.getTotalPrice())

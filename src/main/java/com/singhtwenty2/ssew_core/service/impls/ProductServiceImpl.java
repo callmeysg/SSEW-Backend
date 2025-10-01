@@ -302,8 +302,8 @@ public class ProductServiceImpl implements ProductService {
         product.setThumbnailObjectKey(uploadResult.getObjectKey());
         product.setThumbnailFileSize(uploadResult.getFileSize());
         product.setThumbnailContentType(uploadResult.getContentType());
-        product.setThumbnailWidth(0);
-        product.setThumbnailHeight(0);
+        product.setThumbnailWidth(processedImage.getMetadata().getWidth());
+        product.setThumbnailHeight(processedImage.getMetadata().getHeight());
 
         productRepository.save(product);
         log.info("Thumbnail uploaded successfully for product: {}", productId);
@@ -332,18 +332,20 @@ public class ProductServiceImpl implements ProductService {
 
         List<ImageUploadResult> uploadResults = s3Service.uploadProductImages(processedImages, productId);
 
-        List<ProductImage> productImages = uploadResults.stream()
-                .map(result -> {
-                    ProductImage productImage = new ProductImage();
-                    productImage.setObjectKey(result.getObjectKey());
-                    productImage.setFileSize(result.getFileSize());
-                    productImage.setContentType(result.getContentType());
-                    productImage.setWidth(0);
-                    productImage.setHeight(0);
-                    productImage.setProduct(product);
-                    return productImage;
-                })
-                .collect(Collectors.toList());
+        List<ProductImage> productImages = new ArrayList<>();
+        for (int i = 0; i < uploadResults.size(); i++) {
+            ImageUploadResult result = uploadResults.get(i);
+            ProcessedImageResult processedImage = processedImages.get(i);
+
+            ProductImage productImage = new ProductImage();
+            productImage.setObjectKey(result.getObjectKey());
+            productImage.setFileSize(result.getFileSize());
+            productImage.setContentType(result.getContentType());
+            productImage.setWidth(processedImage.getMetadata().getWidth());
+            productImage.setHeight(processedImage.getMetadata().getHeight());
+            productImage.setProduct(product);
+            productImages.add(productImage);
+        }
 
         productImageRepository.saveAll(productImages);
 

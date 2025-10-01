@@ -11,12 +11,15 @@
  */
 package com.singhtwenty2.ssew_core.service.impls;
 
+import com.singhtwenty2.ssew_core.data.dto.catalogue.PreSignedUrlDTO;
+import com.singhtwenty2.ssew_core.data.dto.catalogue.PreSignedUrlDTO.PresignedUrlResponse;
 import com.singhtwenty2.ssew_core.data.entity.*;
 import com.singhtwenty2.ssew_core.data.enums.CartType;
 import com.singhtwenty2.ssew_core.data.enums.OrderStatus;
 import com.singhtwenty2.ssew_core.data.repository.CartRepository;
 import com.singhtwenty2.ssew_core.data.repository.OrderRepository;
 import com.singhtwenty2.ssew_core.data.repository.UserRepository;
+import com.singhtwenty2.ssew_core.service.file_handeling.S3Service;
 import com.singhtwenty2.ssew_core.service.order_mangement.OrderService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -45,6 +48,7 @@ public class OrderServiceImpl implements OrderService {
     private final OrderRepository orderRepository;
     private final CartRepository cartRepository;
     private final UserRepository userRepository;
+    private final S3Service s3Service;
 
     @Override
     public OrderResponse createOrder(CreateOrderRequest createRequest, String userId) {
@@ -428,10 +432,25 @@ public class OrderServiceImpl implements OrderService {
                 .canBeCancelledByUser(order.canBeCancelledByUser())
                 .createdAt(order.getCreatedAt() != null ? order.getCreatedAt().toString() : null)
                 .statusUpdatedAt(order.getStatusUpdatedAt() != null ? order.getStatusUpdatedAt().toString() : null)
+                .orderItems(order.getOrderItems().stream().map(this::buildOrderItemResponse).toList())
                 .build();
     }
 
     private OrderItemResponse buildOrderItemResponse(OrderItem orderItem) {
+        PresignedUrlResponse presignedUrlResponse = null;
+        if (StringUtils.hasText(orderItem.getProduct().getThumbnailObjectKey())) {
+            try {
+                presignedUrlResponse = s3Service.generateReadPresignedUrl(
+                        orderItem.getProduct().getThumbnailObjectKey(),
+                        60
+                );
+            } catch (Exception e) {
+                log.warn("Failed to generate thumbnail URL for product {}: {}",
+                        orderItem.getProductSku(), e.getMessage());
+            }
+        }
+
+        assert presignedUrlResponse != null;
         return OrderItemResponse.builder()
                 .orderItemId(orderItem.getId().toString())
                 .productId(orderItem.getProduct().getId().toString())
@@ -441,6 +460,9 @@ public class OrderServiceImpl implements OrderService {
                 .quantity(orderItem.getQuantity())
                 .unitPrice(orderItem.getUnitPrice())
                 .totalPrice(orderItem.getTotalPrice())
+                .thumbnailUrl(
+                        presignedUrlResponse.getPresignedUrl() != null ? presignedUrlResponse.getPresignedUrl() : null
+                )
                 .build();
     }
 

@@ -21,17 +21,17 @@ spring:
   jpa:
     database-platform: org.hibernate.dialect.PostgreSQLDialect
     hibernate:
-      ddl-auto: update
+      ddl-auto: validate
     show-sql: false
     properties:
       hibernate:
-        format_sql: true
+        format_sql: false
   data:
     redis:
       url: ${SPRING_DATA_REDIS_URL}
       ssl:
-        enabled: false
-      timeout: 2000ms
+        enabled: ${SPRING_DATA_REDIS_SSL_ENABLED:true}
+      timeout: 3000ms
   main:
     banner-mode: off
   web:
@@ -47,17 +47,19 @@ spring:
       file-size-threshold: 2KB
 
 server:
-  port: 9000
+  port: ${SERVER_PORT:9000}
 
 logging:
   level:
-    com.singhtwenty2: INFO
+    com.singhtwenty2: WARN
+    org.springframework.web: WARN
+    org.hibernate: WARN
 
 app:
   security:
     developer-secret: ${APP_SECURITY_DEVELOPER_SECRET}
   watermark:
-    default-text: ${APP_WATERMARK_DEFAULT_TEXT:Exclusive Product}
+    default-text: ${APP_WATERMARK_DEFAULT_TEXT:Premium Quality}
     enabled: ${APP_WATERMARK_ENABLED:true}
 
 jwt:
@@ -71,3 +73,19 @@ aws:
     permanent-folder: ${AWS_S3_PERMANENT_FOLDER:permanent}
   accessKey: ${AWS_ACCESS_KEY_ID}
   secretKey: ${AWS_SECRET_ACCESS_KEY}
+
+sentry:
+  dsn: ${SENTRY_DSN}
+  send-default-pii: false
+  logging:
+    enabled: true
+    minimum-event-level: error
+    minimum-breadcrumb-level: warn
+  traces-sample-rate: 0.01
+  environment: production
+  release: ${APP_VERSION:ssew-core@1.0.0}
+  enable-tracing: true
+  debug: false
+  tags:
+    service: ssew-core
+    version: ${APP_VERSION:1.0.0}

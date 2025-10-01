@@ -23,76 +23,54 @@ import static com.singhtwenty2.ssew_core.data.dto.catalogue.ImageDTO.*;
 
 public interface ImageProcessingService {
 
-    /**
-     * Process an image with the given configuration
-     */
     ProcessedImageResult processImage(MultipartFile file, ImageProcessingConfig config);
 
-    /**
-     * Process a brand logo with optimized settings
-     */
+    ProcessedImageResult processImage(MultipartFile file, ImageProcessingConfig config, String watermarkText);
+
     ProcessedImageResult processManufacturerLogo(MultipartFile file);
 
-    /**
-     * Process a product image (catalog or thumbnail)
-     */
     ProcessedImageResult processProductImage(MultipartFile file, boolean isThumbnail);
 
-    /**
-     * Process multiple images for a product
-     */
+    ProcessedImageResult processProductImage(MultipartFile file, boolean isThumbnail, String watermarkText);
+
     default List<ProcessedImageResult> processProductImages(List<MultipartFile> files, boolean generateThumbnails) {
         return files.stream()
                 .map(file -> processProductImage(file, false))
                 .toList();
     }
 
-    /**
-     * Validate if the file is a supported image format
-     */
+    default List<ProcessedImageResult> processProductImages(List<MultipartFile> files, boolean generateThumbnails, String watermarkText) {
+        return files.stream()
+                .map(file -> processProductImage(file, false, watermarkText))
+                .toList();
+    }
+
     boolean isValidImageFormat(MultipartFile file);
 
-    /**
-     * Extract metadata from an image file
-     */
     ImageMetadata extractImageMetadata(MultipartFile file);
 
-    /**
-     * Get supported image formats
-     */
     default String[] getSupportedFormats() {
         return new String[]{"jpg", "jpeg", "png", "webp", "gif", "bmp"};
     }
 
-    /**
-     * Get the maximum allowed file size in bytes
-     */
     default long getMaxFileSize() {
         return 10 * 1024 * 1024;
     }
 
-    /**
-     * Validate image dimensions
-     */
     default boolean validateDimensions(int width, int height, int minWidth, int minHeight, int maxWidth, int maxHeight) {
         return width >= minWidth && height >= minHeight && width <= maxWidth && height <= maxHeight;
     }
 
-    /**
-     * Get image requirements for different types
-     */
     default ImageRequirements getImageRequirements(String imageType) {
         return switch (imageType.toLowerCase()) {
-            case "brand-logo", "brand_logo" -> ImageRequirements.forBrandLogo();
+            case "brand-logo", "brand_logo", "manufacturer-logo", "manufacturer_logo" ->
+                    ImageRequirements.forBrandLogo();
             case "product-image", "product_image" -> ImageRequirements.forProductImage();
             case "product-thumbnail", "product_thumbnail" -> ImageRequirements.forProductThumbnail();
             default -> throw new IllegalArgumentException("Unsupported image type: " + imageType);
         };
     }
 
-    /**
-     * Comprehensive validation for any image type
-     */
     default ValidationResult validateImage(MultipartFile file, String imageType) {
         if (file == null || file.isEmpty()) {
             return ValidationResult.failure("Image file is required");
@@ -129,9 +107,6 @@ public interface ImageProcessingService {
         }
     }
 
-    /**
-     * Validation result helper class
-     */
     @Setter
     @Getter
     @Data

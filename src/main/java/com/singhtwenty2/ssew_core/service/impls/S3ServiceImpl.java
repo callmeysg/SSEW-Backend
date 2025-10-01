@@ -15,6 +15,7 @@ import com.singhtwenty2.ssew_core.service.file_handeling.S3Service;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.core.env.Environment;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -46,37 +47,54 @@ public class S3ServiceImpl implements S3Service {
 
     private final S3Client s3Client;
     private final S3Presigner s3Presigner;
+    private final Environment environment;
 
-    @Value("${aws.s3.temp-bucket}")
-    private String bucketName;
+    @Value("${aws.s3.temp-bucket:#{null}}")
+    private String configuredBucketName;
 
     @Value("${aws.region}")
     private String region;
 
-    private static final String BRAND_FOLDER = "brands";
+    private static final String MANUFACTURER_FOLDER = "manufacturers";
     private static final String PRODUCT_FOLDER = "products";
     private static final String THUMBNAIL_SUBFOLDER = "thumbnails";
     private static final String CATALOG_SUBFOLDER = "catalog";
 
+    private String bucketName;
+
+    private String getBucketName() {
+        if (bucketName == null) {
+            if (configuredBucketName != null) {
+                bucketName = configuredBucketName;
+            } else {
+                String[] activeProfiles = environment.getActiveProfiles();
+                String profile = activeProfiles.length > 0 ? activeProfiles[0] : "dev";
+                bucketName = String.format("ssew-bucket-%s", profile);
+            }
+        }
+        return bucketName;
+    }
+
     @Override
     public void initializeS3Bucket() {
         try {
+            String bucket = getBucketName();
             HeadBucketRequest headBucketRequest = HeadBucketRequest.builder()
-                    .bucket(bucketName)
+                    .bucket(bucket)
                     .build();
 
             try {
                 s3Client.headBucket(headBucketRequest);
-                log.info("Bucket {} already exists", bucketName);
+                log.info("Bucket {} already exists", bucket);
             } catch (NoSuchBucketException e) {
                 CreateBucketRequest createBucketRequest = CreateBucketRequest.builder()
-                        .bucket(bucketName)
+                        .bucket(bucket)
                         .createBucketConfiguration(CreateBucketConfiguration.builder()
                                 .locationConstraint(BucketLocationConstraint.fromValue(region))
                                 .build())
                         .build();
                 s3Client.createBucket(createBucketRequest);
-                log.info("Bucket {} created successfully", bucketName);
+                log.info("Bucket {} created successfully", bucket);
             }
 
             configureBucketPolicies();
@@ -91,10 +109,10 @@ public class S3ServiceImpl implements S3Service {
     @Override
     public ImageUploadResult uploadManufacturerLogo(ProcessedImageResult processedImage, String brandSlug) {
         try {
-            String objectKey = generateBrandLogoKey(brandSlug, processedImage.getFileExtension());
+            String objectKey = generateManufacturerLogoKey(brandSlug, processedImage.getFileExtension());
 
             Map<String, String> metadata = Map.of(
-                    "entity-type", "brand",
+                    "entity-type", "manufacturer",
                     "entity-id", brandSlug,
                     "image-type", "logo",
                     "upload-timestamp", LocalDateTime.now().format(DateTimeFormatter.ISO_LOCAL_DATE_TIME),
@@ -107,8 +125,8 @@ public class S3ServiceImpl implements S3Service {
             return uploadImageToS3(objectKey, processedImage, metadata);
 
         } catch (Exception e) {
-            log.error("Failed to upload brand logo for brand {}: {}", brandSlug, e.getMessage(), e);
-            return ImageUploadResult.failure("Failed to upload brand logo: " + e.getMessage());
+            log.error("Failed to upload manufacturer logo for brand {}: {}", brandSlug, e.getMessage(), e);
+            return ImageUploadResult.failure("Failed to upload manufacturer logo: " + e.getMessage());
         }
     }
 
@@ -140,10 +158,8 @@ public class S3ServiceImpl implements S3Service {
     public List<ImageUploadResult> uploadProductImages(List<ProcessedImageResult> processedImages, String productId) {
         List<ImageUploadResult> results = new ArrayList<>();
 
-        for (int i = 0; i < processedImages.size(); i++) {
-            ProcessedImageResult processedImage = processedImages.get(i);
-            boolean isThumbnail = (i == 0);
-            ImageUploadResult result = uploadProductImage(processedImage, productId, isThumbnail);
+        for (ProcessedImageResult processedImage : processedImages) {
+            ImageUploadResult result = uploadProductImage(processedImage, productId, false);
             results.add(result);
         }
 
@@ -154,7 +170,7 @@ public class S3ServiceImpl implements S3Service {
     public PresignedUrlResponse generateReadPresignedUrl(String objectKey, Integer expirationMinutes) {
         try {
             GetObjectRequest getObjectRequest = GetObjectRequest.builder()
-                    .bucket(bucketName)
+                    .bucket(getBucketName())
                     .key(objectKey)
                     .build();
 
@@ -164,10 +180,10 @@ public class S3ServiceImpl implements S3Service {
                     .build();
 
             PresignedGetObjectRequest presignedRequest = s3Presigner.presignGetObject(presignRequest);
-            String s3Url = String.format("s3://%s/%s", bucketName, objectKey);
+            String s3Url = String.format("s3://%s/%s", getBucketName(), objectKey);
 
             HeadObjectRequest headRequest = HeadObjectRequest.builder()
-                    .bucket(bucketName)
+                    .bucket(getBucketName())
                     .key(objectKey)
                     .build();
 
@@ -195,7 +211,7 @@ public class S3ServiceImpl implements S3Service {
     public PresignedUrlResponse generateDownloadPresignedUrl(String objectKey, Integer expirationMinutes) {
         try {
             HeadObjectRequest headRequest = HeadObjectRequest.builder()
-                    .bucket(bucketName)
+                    .bucket(getBucketName())
                     .key(objectKey)
                     .build();
 
@@ -204,7 +220,7 @@ public class S3ServiceImpl implements S3Service {
             String imageType = headResponse.metadata().getOrDefault("image-type", "unknown");
 
             GetObjectRequest getObjectRequest = GetObjectRequest.builder()
-                    .bucket(bucketName)
+                    .bucket(getBucketName())
                     .key(objectKey)
                     .responseContentDisposition("attachment; filename=\"" + filename + "\"")
                     .build();
@@ -215,7 +231,7 @@ public class S3ServiceImpl implements S3Service {
                     .build();
 
             PresignedGetObjectRequest presignedRequest = s3Presigner.presignGetObject(presignRequest);
-            String s3Url = String.format("s3://%s/%s", bucketName, objectKey);
+            String s3Url = String.format("s3://%s/%s", getBucketName(), objectKey);
 
             return PresignedUrlResponse.builder()
                     .presignedUrl(presignedRequest.url().toString())
@@ -238,7 +254,7 @@ public class S3ServiceImpl implements S3Service {
     public boolean deleteImage(String objectKey) {
         try {
             DeleteObjectRequest deleteRequest = DeleteObjectRequest.builder()
-                    .bucket(bucketName)
+                    .bucket(getBucketName())
                     .key(objectKey)
                     .build();
 
@@ -274,7 +290,7 @@ public class S3ServiceImpl implements S3Service {
     public boolean imageExists(String objectKey) {
         try {
             HeadObjectRequest headRequest = HeadObjectRequest.builder()
-                    .bucket(bucketName)
+                    .bucket(getBucketName())
                     .key(objectKey)
                     .build();
 
@@ -292,7 +308,7 @@ public class S3ServiceImpl implements S3Service {
     private void configureBucketPolicies() {
         try {
             PutBucketVersioningRequest versioningRequest = PutBucketVersioningRequest.builder()
-                    .bucket(bucketName)
+                    .bucket(getBucketName())
                     .versioningConfiguration(VersioningConfiguration.builder()
                             .status(BucketVersioningStatus.ENABLED)
                             .build())
@@ -323,12 +339,12 @@ public class S3ServiceImpl implements S3Service {
                     .build();
 
             PutBucketLifecycleConfigurationRequest lifecycleRequest = PutBucketLifecycleConfigurationRequest.builder()
-                    .bucket(bucketName)
+                    .bucket(getBucketName())
                     .lifecycleConfiguration(lifecycleConfig)
                     .build();
 
             s3Client.putBucketLifecycleConfiguration(lifecycleRequest);
-            log.info("Bucket policies configured successfully for bucket {}", bucketName);
+            log.info("Bucket policies configured successfully for bucket {}", getBucketName());
 
         } catch (Exception e) {
             log.warn("Failed to configure bucket policies: {}", e.getMessage());
@@ -337,10 +353,8 @@ public class S3ServiceImpl implements S3Service {
 
     private void createFolderStructure() {
         List<String> folders = List.of(
-                BRAND_FOLDER + "/",
-                PRODUCT_FOLDER + "/",
-                PRODUCT_FOLDER + "/" + THUMBNAIL_SUBFOLDER + "/",
-                PRODUCT_FOLDER + "/" + CATALOG_SUBFOLDER + "/"
+                MANUFACTURER_FOLDER + "/",
+                PRODUCT_FOLDER + "/"
         );
 
         for (String folder : folders) {
@@ -351,7 +365,7 @@ public class S3ServiceImpl implements S3Service {
     private void createFolder(String folderKey) {
         try {
             PutObjectRequest putObjectRequest = PutObjectRequest.builder()
-                    .bucket(bucketName)
+                    .bucket(getBucketName())
                     .key(folderKey)
                     .build();
 
@@ -369,7 +383,7 @@ public class S3ServiceImpl implements S3Service {
     private ImageUploadResult uploadImageToS3(String objectKey, ProcessedImageResult processedImage, Map<String, String> metadata) {
         try {
             PutObjectRequest putObjectRequest = PutObjectRequest.builder()
-                    .bucket(bucketName)
+                    .bucket(getBucketName())
                     .key(objectKey)
                     .contentType(processedImage.getContentType())
                     .contentLength(processedImage.getFileSizeBytes())
@@ -380,8 +394,8 @@ public class S3ServiceImpl implements S3Service {
             RequestBody requestBody = RequestBody.fromBytes(processedImage.getImageData());
             s3Client.putObject(putObjectRequest, requestBody);
 
-            String s3Url = String.format("s3://%s/%s", bucketName, objectKey);
-            String publicUrl = String.format("https://%s.s3.%s.amazonaws.com/%s", bucketName, region, objectKey);
+            String s3Url = String.format("s3://%s/%s", getBucketName(), objectKey);
+            String publicUrl = String.format("https://%s.s3.%s.amazonaws.com/%s", getBucketName(), region, objectKey);
 
             log.info("Successfully uploaded image to S3: {}", objectKey);
 
@@ -399,10 +413,10 @@ public class S3ServiceImpl implements S3Service {
         }
     }
 
-    private String generateBrandLogoKey(String brandSlug, String fileExtension) {
+    private String generateManufacturerLogoKey(String brandSlug, String fileExtension) {
         String timestamp = LocalDateTime.now().format(DateTimeFormatter.ofPattern("yyyyMMdd-HHmmss"));
         String uniqueId = UUID.randomUUID().toString().substring(0, 8);
-        return String.format("%s/%s/logo-%s-%s%s", BRAND_FOLDER, brandSlug, timestamp, uniqueId, fileExtension);
+        return String.format("%s/%s/logo-%s-%s%s", MANUFACTURER_FOLDER, brandSlug, timestamp, uniqueId, fileExtension);
     }
 
     private String generateProductImageKey(String productId, boolean isThumbnail, String fileExtension) {

@@ -87,12 +87,11 @@ public class OrderDTO {
         private String productId;
         private String productName;
         private String productSku;
-        // Model number can be added later if needed
-        // private String productModelNumber;
         private String manufacturerName;
         private Integer quantity;
         private BigDecimal unitPrice;
         private BigDecimal totalPrice;
+        private String thumbnailUrl;
     }
 
     @Setter
@@ -155,6 +154,7 @@ public class OrderDTO {
         private Boolean canBeCancelledByUser;
         private String createdAt;
         private String statusUpdatedAt;
+        private List<OrderItemResponse> orderItems;
     }
 
     @Setter
