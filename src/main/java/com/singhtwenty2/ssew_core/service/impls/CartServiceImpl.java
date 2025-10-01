@@ -11,7 +11,6 @@
  */
 package com.singhtwenty2.ssew_core.service.impls;
 
-import com.singhtwenty2.ssew_core.data.dto.catalogue.PreSignedUrlDTO;
 import com.singhtwenty2.ssew_core.data.dto.catalogue.PreSignedUrlDTO.PresignedUrlResponse;
 import com.singhtwenty2.ssew_core.data.entity.Cart;
 import com.singhtwenty2.ssew_core.data.entity.CartItem;
@@ -31,6 +30,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.util.StringUtils;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
@@ -363,8 +363,22 @@ public class CartServiceImpl implements CartService {
 
     private CartItemResponse mapCartItemToResponse(CartItem cartItem) {
         Product product = cartItem.getProduct();
-        PresignedUrlResponse presignedUrlResponse = s3Service.generateReadPresignedUrl(
-                product.getThumbnailObjectKey(), 60);
+        String thumbnailUrl = null;
+
+        if (StringUtils.hasText(product.getThumbnailObjectKey())) {
+            try {
+                PresignedUrlResponse presignedUrlResponse = s3Service.generateReadPresignedUrl(
+                        product.getThumbnailObjectKey(),
+                        60
+                );
+                if (presignedUrlResponse != null) {
+                    thumbnailUrl = presignedUrlResponse.getPresignedUrl();
+                }
+            } catch (Exception e) {
+                log.warn("Failed to generate thumbnail URL for product {}: {}",
+                        product.getSku(), e.getMessage());
+            }
+        }
 
         return CartItemResponse.builder()
                 .cartItemId(cartItem.getId().toString())
@@ -373,7 +387,7 @@ public class CartServiceImpl implements CartService {
                 .productSlug(product.getSlug())
                 .productSku(product.getSku())
                 .manufacturerName(product.getManufacturerName())
-                .thumbnailUrl(presignedUrlResponse != null ? presignedUrlResponse.getPresignedUrl() : null)
+                .thumbnailUrl(thumbnailUrl)
                 .quantity(cartItem.getQuantity())
                 .unitPrice(cartItem.getPriceAtTime())
                 .totalPrice(cartItem.getTotalPrice())

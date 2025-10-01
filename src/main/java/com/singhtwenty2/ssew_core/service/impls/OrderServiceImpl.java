@@ -11,7 +11,6 @@
  */
 package com.singhtwenty2.ssew_core.service.impls;
 
-import com.singhtwenty2.ssew_core.data.dto.catalogue.PreSignedUrlDTO;
 import com.singhtwenty2.ssew_core.data.dto.catalogue.PreSignedUrlDTO.PresignedUrlResponse;
 import com.singhtwenty2.ssew_core.data.entity.*;
 import com.singhtwenty2.ssew_core.data.enums.CartType;
@@ -437,20 +436,22 @@ public class OrderServiceImpl implements OrderService {
     }
 
     private OrderItemResponse buildOrderItemResponse(OrderItem orderItem) {
-        PresignedUrlResponse presignedUrlResponse = null;
+        String thumbnailUrl = null;
         if (StringUtils.hasText(orderItem.getProduct().getThumbnailObjectKey())) {
             try {
-                presignedUrlResponse = s3Service.generateReadPresignedUrl(
+                PresignedUrlResponse presignedUrlResponse = s3Service.generateReadPresignedUrl(
                         orderItem.getProduct().getThumbnailObjectKey(),
                         60
                 );
+                if (presignedUrlResponse != null) {
+                    thumbnailUrl = presignedUrlResponse.getPresignedUrl();
+                }
             } catch (Exception e) {
                 log.warn("Failed to generate thumbnail URL for product {}: {}",
                         orderItem.getProductSku(), e.getMessage());
             }
         }
 
-        assert presignedUrlResponse != null;
         return OrderItemResponse.builder()
                 .orderItemId(orderItem.getId().toString())
                 .productId(orderItem.getProduct().getId().toString())
@@ -460,9 +461,7 @@ public class OrderServiceImpl implements OrderService {
                 .quantity(orderItem.getQuantity())
                 .unitPrice(orderItem.getUnitPrice())
                 .totalPrice(orderItem.getTotalPrice())
-                .thumbnailUrl(
-                        presignedUrlResponse.getPresignedUrl() != null ? presignedUrlResponse.getPresignedUrl() : null
-                )
+                .thumbnailUrl(thumbnailUrl)
                 .build();
     }
 
