@@ -1,6 +1,6 @@
 #!/bin/bash
 #
-# Copyright 2025 SSEW Core Service
+# Copyright 2025 Aryan Singh
 # Developer: Aryan Singh (@singhtwenty2)
 # Portfolio: https://singhtwenty2.pages.dev/
 # This file is part of SSEW E-commerce Backend System
@@ -24,7 +24,7 @@ sudo systemctl enable docker
 mkdir -p /home/ubuntu/ssew-deployment
 cd /home/ubuntu/ssew-deployment
 
-curl -o docker-compose.yml https://raw.githubusercontent.com/callmeysg/SSEW-Backend-Core-Service/main/docker-compose.yml
+curl -o docker-compose.yml https://raw.githubusercontent.com/callmeysg/SSEW-Backend/main/docker-compose.yml
 
 docker-compose up -d postgres redis
 

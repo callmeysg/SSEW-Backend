@@ -1,5 +1,5 @@
 #
-# Copyright 2025 SSEW Core Service
+# Copyright 2025 Aryan Singh
 # Developer: Aryan Singh (@singhtwenty2)
 # Portfolio: https://singhtwenty2.pages.dev/
 # This file is part of SSEW E-commerce Backend System
@@ -49,7 +49,7 @@ services:
       retries: 5
 
   app:
-    image: singhtwenty2/ssew-core-service:${IMAGE_TAG:-latest}
+    image: singhtwenty2/ssew-commerce-service:${IMAGE_TAG:-latest}
     container_name: ssew-app
     ports:
       - "9000:9000"
