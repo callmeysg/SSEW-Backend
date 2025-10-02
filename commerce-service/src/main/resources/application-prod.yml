@@ -1,5 +1,5 @@
 #
-# Copyright 2025 SSEW Core Service
+# Copyright 2025 Aryan Singh
 # Developer: Aryan Singh (@singhtwenty2)
 # Portfolio: https://singhtwenty2.pages.dev/
 # This file is part of SSEW E-commerce Backend System
@@ -12,7 +12,7 @@
 
 spring:
   application:
-    name: ssew-core
+    name: commerce-service
   datasource:
     driver-class-name: org.postgresql.Driver
     url: ${SPRING_DATASOURCE_URL}

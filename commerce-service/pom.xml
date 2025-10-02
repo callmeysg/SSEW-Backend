@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <!--
 
-    Copyright 2025 SSEW Core Service
+    Copyright 2025 Aryan Singh
     Developer: Aryan Singh (@singhtwenty2)
     Portfolio: https://singhtwenty2.pages.dev/
     This file is part of SSEW E-commerce Backend System
@@ -46,10 +46,10 @@
         </developer>
     </developers>
     <scm>
-        <connection>scm:git:git://github.com/callmeysg/SSEW-Backend-Core-Service.git</connection>
-        <developerConnection>scm:git:ssh://github.com/callmeysg/SSEW-Backend-Core-Service.git</developerConnection>
+        <connection>scm:git:git://github.com/callmeysg/SSEW-Backend.git</connection>
+        <developerConnection>scm:git:ssh://github.com/callmeysg/SSEW-Backend.git</developerConnection>
         <tag>HEAD</tag>
-        <url>https://github.com/callmeysg/SSEW-Backend-Core-Service</url>
+        <url>https://github.com/callmeysg/SSEW-Backend</url>
     </scm>
     <properties>
         <java.version>21</java.version>
@@ -149,13 +149,6 @@
             <version>3.10.1</version>
         </dependency>
 
-        <!--       TODO: REMOVE IT IN PROD-->
-        <dependency>
-            <groupId>org.springdoc</groupId>
-            <artifactId>springdoc-openapi-starter-webmvc-ui</artifactId>
-            <version>2.8.8</version>
-        </dependency>
-
         <!-- Sentry Spring Boot Integration -->
         <dependency>
             <groupId>io.sentry</groupId>
@@ -193,7 +186,7 @@
                 <version>4.5</version>
                 <configuration>
                     <properties>
-                        <owner>SSEW Core Service</owner>
+                        <owner>Aryan Singh</owner>
                         <year>2025</year>
                         <developer>Aryan Singh (@singhtwenty2)</developer>
                         <portfolio>https://singhtwenty2.pages.dev/</portfolio>

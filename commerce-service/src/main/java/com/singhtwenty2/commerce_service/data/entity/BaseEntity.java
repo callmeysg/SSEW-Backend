@@ -1,0 +1,44 @@
+/**
+ * Copyright 2025 Aryan Singh
+ * Developer: Aryan Singh (@singhtwenty2)
+ * Portfolio: https://singhtwenty2.pages.dev/
+ * This file is part of SSEW E-commerce Backend System
+ * Licensed under MIT License
+ * For commercial use and inquiries: aryansingh.corp@gmail.com
+ * @author Aryan Singh (@singhtwenty2)
+ * @project SSEW E-commerce Backend System
+ * @since 2025
+ */
+package com.singhtwenty2.commerce_service.data.entity;
+
+import jakarta.persistence.*;
+import lombok.Getter;
+import lombok.Setter;
+import org.hibernate.annotations.CreationTimestamp;
+import org.hibernate.annotations.UpdateTimestamp;
+
+import java.time.LocalDateTime;
+import java.util.UUID;
+
+@MappedSuperclass
+@Getter
+@Setter
+public abstract class BaseEntity {
+
+    @Id
+    @GeneratedValue(strategy = GenerationType.UUID)
+    @Column(name = "id", updatable = false, nullable = false)
+    private UUID id;
+
+    @CreationTimestamp
+    @Column(name = "created_at", nullable = false, updatable = false)
+    private LocalDateTime createdAt;
+
+    @UpdateTimestamp
+    @Column(name = "updated_at", nullable = false)
+    private LocalDateTime updatedAt;
+
+    @Version
+    @Column(name = "version", nullable = true)
+    private Long version = 0L;
+}
