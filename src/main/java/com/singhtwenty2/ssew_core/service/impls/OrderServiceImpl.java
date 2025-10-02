@@ -20,6 +20,7 @@ import com.singhtwenty2.ssew_core.data.repository.OrderRepository;
 import com.singhtwenty2.ssew_core.data.repository.UserRepository;
 import com.singhtwenty2.ssew_core.service.file_handeling.S3Service;
 import com.singhtwenty2.ssew_core.service.order_mangement.OrderService;
+import com.singhtwenty2.ssew_core.service.polling.RedisEventService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.Page;
@@ -48,6 +49,7 @@ public class OrderServiceImpl implements OrderService {
     private final CartRepository cartRepository;
     private final UserRepository userRepository;
     private final S3Service s3Service;
+    private final RedisEventService redisEventService;
 
     @Override
     public OrderResponse createOrder(CreateOrderRequest createRequest, String userId) {
@@ -59,6 +61,12 @@ public class OrderServiceImpl implements OrderService {
         validateCartForOrder(cart);
         Order savedOrder = createOrderFromCart(createRequest, user, cart);
         clearCart(cart);
+
+        redisEventService.publishNewOrderEventForAdmin(
+                savedOrder.getId().toString(),
+                savedOrder.getCustomerName(),
+                savedOrder.getTotalAmount().toString()
+        );
 
         log.info("Order created successfully with ID: {}", savedOrder.getId());
         return buildOrderResponse(savedOrder);
@@ -149,6 +157,23 @@ public class OrderServiceImpl implements OrderService {
 
         Order updatedOrder = orderRepository.save(order);
 
+        redisEventService.publishOrderStatusChangeEvent(
+                orderId,
+                order.getUser().getId().toString(),
+                updateRequest.getStatus().toString()
+        );
+
+        if (isAdmin) {
+            redisEventService.publishOrderUpdateEventForAdmin(
+                    orderId,
+                    "STATUS_CHANGE",
+                    Map.of(
+                            "newStatus", updateRequest.getStatus().toString(),
+                            "previousStatus", order.getStatus().toString()
+                    )
+            );
+        }
+
         log.info("Order status updated successfully for ID: {} to status: {}", orderId, updateRequest.getStatus());
         return buildOrderResponse(updatedOrder);
     }
@@ -170,6 +195,22 @@ public class OrderServiceImpl implements OrderService {
         order.updateStatus(OrderStatus.CANCELLED, remarks, false);
         Order cancelledOrder = orderRepository.save(order);
 
+        redisEventService.publishOrderStatusChangeEvent(
+                orderId,
+                userId,
+                OrderStatus.CANCELLED.toString()
+        );
+
+        redisEventService.publishOrderUpdateEventForAdmin(
+                orderId,
+                "USER_CANCELLATION",
+                Map.of(
+                        "cancelledBy", "USER",
+                        "userId", userId,
+                        "remarks", remarks != null ? remarks : ""
+                )
+        );
+
         log.info("Order cancelled successfully by user for ID: {}", orderId);
         return buildOrderResponse(cancelledOrder);
     }
@@ -190,6 +231,21 @@ public class OrderServiceImpl implements OrderService {
         }
 
         Order cancelledOrder = orderRepository.save(order);
+
+        redisEventService.publishOrderStatusChangeEvent(
+                orderId,
+                order.getUser().getId().toString(),
+                OrderStatus.CANCELLED.toString()
+        );
+
+        redisEventService.publishOrderUpdateEventForAdmin(
+                orderId,
+                "ADMIN_CANCELLATION",
+                Map.of(
+                        "cancelledBy", "ADMIN",
+                        "remarks", remarks != null ? remarks : ""
+                )
+        );
 
         log.info("Order cancelled successfully by admin for ID: {}", orderId);
         return buildOrderResponse(cancelledOrder);
