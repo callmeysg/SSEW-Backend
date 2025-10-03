@@ -1,17 +1,4 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<!--
-
-    Copyright 2025 Aryan Singh
-    Developer: Aryan Singh (@singhtwenty2)
-    Portfolio: https://singhtwenty2.pages.dev/
-    This file is part of SSEW E-commerce Backend System
-    Licensed under MIT License
-    For commercial use and inquiries: aryansingh.corp@gmail.com
-    @author Aryan Singh (@singhtwenty2)
-    @project SSEW E-commerce Backend System
-    @since 2025
-
--->
 <project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
          xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
     <modelVersion>4.0.0</modelVersion>
@@ -53,22 +40,15 @@
     </scm>
     <properties>
         <java.version>21</java.version>
-        <!-- License Plugin Properties -->
         <license.header>src/main/resources/license-header.txt</license.header>
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
     </properties>
     <dependencies>
+        <!-- Spring Boot Starters -->
         <dependency>
             <groupId>org.springframework.boot</groupId>
             <artifactId>spring-boot-starter</artifactId>
         </dependency>
-
-        <dependency>
-            <groupId>org.springframework.boot</groupId>
-            <artifactId>spring-boot-starter-test</artifactId>
-            <scope>test</scope>
-        </dependency>
-
         <dependency>
             <groupId>org.springframework.boot</groupId>
             <artifactId>spring-boot-starter-actuator</artifactId>
@@ -87,26 +67,31 @@
         </dependency>
         <dependency>
             <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-validation</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-data-redis</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-mail</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
             <artifactId>spring-boot-devtools</artifactId>
             <scope>runtime</scope>
             <optional>true</optional>
         </dependency>
+
+        <!-- Database -->
         <dependency>
             <groupId>org.postgresql</groupId>
             <artifactId>postgresql</artifactId>
             <scope>runtime</scope>
         </dependency>
-        <dependency>
-            <groupId>org.springframework.security</groupId>
-            <artifactId>spring-security-test</artifactId>
-            <scope>test</scope>
-        </dependency>
 
-        <dependency>
-            <groupId>org.springframework.boot</groupId>
-            <artifactId>spring-boot-starter-mail</artifactId>
-            <version>3.3.0</version>
-        </dependency>
+        <!-- JWT -->
         <dependency>
             <groupId>io.jsonwebtoken</groupId>
             <artifactId>jjwt-api</artifactId>
@@ -116,67 +101,130 @@
             <groupId>io.jsonwebtoken</groupId>
             <artifactId>jjwt-impl</artifactId>
             <version>0.12.6</version>
-            <scope>compile</scope>
+            <scope>runtime</scope>
         </dependency>
         <dependency>
             <groupId>io.jsonwebtoken</groupId>
             <artifactId>jjwt-jackson</artifactId>
             <version>0.12.6</version>
-            <scope>compile</scope>
+            <scope>runtime</scope>
         </dependency>
-        <dependency>
-            <groupId>org.springframework.boot</groupId>
-            <artifactId>spring-boot-starter-validation</artifactId>
-            <version>3.5.0</version>
-        </dependency>
+
+        <!-- Utilities -->
         <dependency>
             <groupId>org.projectlombok</groupId>
             <artifactId>lombok</artifactId>
             <optional>true</optional>
         </dependency>
-        <dependency>
-            <groupId>org.springframework.boot</groupId>
-            <artifactId>spring-boot-starter-data-redis</artifactId>
-        </dependency>
+
+        <!-- AWS S3 -->
         <dependency>
             <groupId>software.amazon.awssdk</groupId>
             <artifactId>s3</artifactId>
             <version>2.29.0</version>
         </dependency>
+
+        <!-- Image Processing -->
         <dependency>
             <groupId>com.twelvemonkeys.imageio</groupId>
             <artifactId>imageio-webp</artifactId>
             <version>3.10.1</version>
         </dependency>
 
-        <!-- Sentry Spring Boot Integration -->
+        <!-- Sentry -->
         <dependency>
             <groupId>io.sentry</groupId>
             <artifactId>sentry-spring-boot-starter-jakarta</artifactId>
             <version>7.16.0</version>
         </dependency>
-
-        <!-- Sentry Logback Integration for Logs -->
         <dependency>
             <groupId>io.sentry</groupId>
             <artifactId>sentry-logback</artifactId>
             <version>7.16.0</version>
         </dependency>
-
-        <!-- OpenTelemetry Integration -->
         <dependency>
             <groupId>io.sentry</groupId>
             <artifactId>sentry-opentelemetry-core</artifactId>
             <version>7.16.0</version>
         </dependency>
+
+        <!-- gRPC and Protobuf Dependencies -->
+        <dependency>
+            <groupId>io.grpc</groupId>
+            <artifactId>grpc-netty-shaded</artifactId>
+            <version>1.58.0</version>
+            <scope>runtime</scope>
+        </dependency>
+        <dependency>
+            <groupId>io.grpc</groupId>
+            <artifactId>grpc-protobuf</artifactId>
+            <version>1.58.0</version>
+        </dependency>
+        <dependency>
+            <groupId>io.grpc</groupId>
+            <artifactId>grpc-stub</artifactId>
+            <version>1.58.0</version>
+        </dependency>
+        <dependency>
+            <groupId>com.google.protobuf</groupId>
+            <artifactId>protobuf-java-util</artifactId>
+            <version>3.24.3</version>
+        </dependency>
+        <dependency>
+            <groupId>javax.annotation</groupId>
+            <artifactId>javax.annotation-api</artifactId>
+            <version>1.3.2</version>
+        </dependency>
+
+        <!-- Testing -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-test</artifactId>
+            <scope>test</scope>
+        </dependency>
+        <dependency>
+            <groupId>org.springframework.security</groupId>
+            <artifactId>spring-security-test</artifactId>
+            <scope>test</scope>
+        </dependency>
     </dependencies>
 
     <build>
         <finalName>ssew-core-service</finalName>
+
+        <!-- THIS EXTENSION IS REQUIRED FOR THE PROTOBUF PLUGIN -->
+        <extensions>
+            <extension>
+                <groupId>kr.motd.maven</groupId>
+                <artifactId>os-maven-plugin</artifactId>
+                <version>1.7.1</version>
+            </extension>
+        </extensions>
+
         <plugins>
             <plugin>
                 <groupId>org.springframework.boot</groupId>
                 <artifactId>spring-boot-maven-plugin</artifactId>
+            </plugin>
+
+            <!-- THIS PLUGIN IS NOW IN THE MAIN BUILD SECTION -->
+            <plugin>
+                <groupId>org.xolstice.maven.plugins</groupId>
+                <artifactId>protobuf-maven-plugin</artifactId>
+                <version>0.6.1</version>
+                <configuration>
+                    <protocArtifact>com.google.protobuf:protoc:3.24.3:exe:${os.detected.classifier}</protocArtifact>
+                    <pluginId>grpc-java</pluginId>
+                    <pluginArtifact>io.grpc:protoc-gen-grpc-java:1.58.0:exe:${os.detected.classifier}</pluginArtifact>
+                </configuration>
+                <executions>
+                    <execution>
+                        <goals>
+                            <goal>compile</goal>
+                            <goal>compile-custom</goal>
+                        </goals>
+                    </execution>
+                </executions>
             </plugin>
 
             <!-- License Maven Plugin for Code Attribution -->
@@ -203,17 +251,7 @@
                                 <exclude>**/LICENSE</exclude>
                                 <exclude>**/.gitignore</exclude>
                                 <exclude>src/test/resources/**</exclude>
-                                <exclude>src/main/resources/**/*.properties</exclude>
-                                <exclude>src/main/resources/**/*.yml</exclude>
-                                <exclude>src/main/resources/**/*.yaml</exclude>
-                                <exclude>src/main/resources/**/*.xml</exclude>
-                                <exclude>src/main/resources/**/*.json</exclude>
-                                <exclude>**/*.md</exclude>
-                                <exclude>**/*.txt</exclude>
-                                <exclude>**/target/**</exclude>
-                                <exclude>**/.mvn/**</exclude>
-                                <exclude>**/mvnw</exclude>
-                                <exclude>**/mvnw.cmd</exclude>
+                                <exclude>src/main/resources/**</exclude>
                             </excludes>
                         </licenseSet>
                     </licenseSets>
@@ -248,7 +286,6 @@
                         <version>0.7.1</version>
                         <extensions>true</extensions>
                         <configuration>
-                            <!-- for showing output of sentry-cli -->
                             <debugSentryCli>true</debugSentryCli>
                             <org>fa8s</org>
                             <project>ssew-backend</project>
@@ -257,11 +294,6 @@
                         <executions>
                             <execution>
                                 <goals>
-                                    <!--
-                                    Generates a JVM (Java, Kotlin, etc.) source bundle and uploads your source code to Sentry.
-                                    This enables source context, allowing you to see your source
-                                    code as part of your stack traces in Sentry.
-                                    -->
                                     <goal>uploadSourceBundle</goal>
                                 </goals>
                             </execution>

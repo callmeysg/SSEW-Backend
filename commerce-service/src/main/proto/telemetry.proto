@@ -1,0 +1,37 @@
+syntax = "proto3";
+
+package telemetry;
+
+option go_package = "github.com/callmeysg/SSEW-Backend/telemetry-service/proto";
+
+option java_package = "com.singhtwenty2.commerce_service.grpc";
+option java_multiple_files = true;
+
+import "google/protobuf/struct.proto";
+import "google/protobuf/empty.proto";
+
+service TelemetryService {
+  rpc PublishOrderStatusChange (PublishOrderStatusChangeRequest) returns (google.protobuf.Empty) {}
+
+  rpc PublishNewOrder (PublishNewOrderRequest) returns (google.protobuf.Empty) {}
+
+  rpc PublishOrderUpdate (PublishOrderUpdateRequest) returns (google.protobuf.Empty) {}
+}
+
+message PublishOrderStatusChangeRequest {
+  string order_id = 1;
+  string user_id = 2;
+  string new_status = 3;
+}
+
+message PublishNewOrderRequest {
+  string order_id = 1;
+  string customer_name = 2;
+  string total_amount = 3;
+}
+
+message PublishOrderUpdateRequest {
+  string order_id = 1;
+  string update_type = 2;
+  google.protobuf.Struct details = 3;
+}

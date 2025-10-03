@@ -1,14 +1,3 @@
-/**
- * Copyright 2025 Aryan Singh
- * Developer: Aryan Singh (@singhtwenty2)
- * Portfolio: https://singhtwenty2.pages.dev/
- * This file is part of SSEW E-commerce Backend System
- * Licensed under MIT License
- * For commercial use and inquiries: aryansingh.corp@gmail.com
- * @author Aryan Singh (@singhtwenty2)
- * @project SSEW E-commerce Backend System
- * @since 2025
- */
 package com.singhtwenty2.commerce_service.service.impls;
 
 import com.singhtwenty2.commerce_service.data.dto.catalogue.PreSignedUrlDTO.PresignedUrlResponse;
@@ -19,8 +8,8 @@ import com.singhtwenty2.commerce_service.data.repository.CartRepository;
 import com.singhtwenty2.commerce_service.data.repository.OrderRepository;
 import com.singhtwenty2.commerce_service.data.repository.UserRepository;
 import com.singhtwenty2.commerce_service.service.file_handeling.S3Service;
+import com.singhtwenty2.commerce_service.service.grpc.TelemetryClientService;
 import com.singhtwenty2.commerce_service.service.order_mangement.OrderService;
-import com.singhtwenty2.commerce_service.service.polling.RedisEventService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.Page;
@@ -49,7 +38,7 @@ public class OrderServiceImpl implements OrderService {
     private final CartRepository cartRepository;
     private final UserRepository userRepository;
     private final S3Service s3Service;
-    private final RedisEventService redisEventService;
+    private final TelemetryClientService telemetryClientService;
 
     @Override
     public OrderResponse createOrder(CreateOrderRequest createRequest, String userId) {
@@ -62,7 +51,7 @@ public class OrderServiceImpl implements OrderService {
         Order savedOrder = createOrderFromCart(createRequest, user, cart);
         clearCart(cart);
 
-        redisEventService.publishNewOrderEventForAdmin(
+        telemetryClientService.publishNewOrderEventForAdmin(
                 savedOrder.getId().toString(),
                 savedOrder.getCustomerName(),
                 savedOrder.getTotalAmount().toString()
@@ -76,10 +65,8 @@ public class OrderServiceImpl implements OrderService {
     @Transactional(readOnly = true)
     public OrderResponse getOrderById(String orderId, String userId) {
         log.debug("Fetching order by ID: {} for user: {}", orderId, userId);
-
         UUID userUuid = parseUUID(userId, "Invalid user ID format");
         Order order = findOrderByIdAndUserId(orderId, userUuid);
-
         return buildOrderResponse(order);
     }
 
@@ -87,7 +74,6 @@ public class OrderServiceImpl implements OrderService {
     @Transactional(readOnly = true)
     public OrderResponse getOrderByIdForAdmin(String orderId) {
         log.debug("Fetching order by ID for admin: {}", orderId);
-
         Order order = findOrderById(orderId);
         return buildOrderResponse(order);
     }
@@ -96,13 +82,10 @@ public class OrderServiceImpl implements OrderService {
     @Transactional(readOnly = true)
     public Page<OrderSummaryResponse> getUserOrders(String userId, OrderStatus status, Pageable pageable) {
         log.debug("Fetching orders for user: {} with status: {}", userId, status);
-
         UUID userUuid = parseUUID(userId, "Invalid user ID format");
-
         Page<Order> orderPage = status != null ?
                 orderRepository.findUserOrdersWithFilters(userUuid, status, pageable) :
                 orderRepository.findByUserIdOrderByCreatedAtDesc(userUuid, pageable);
-
         return orderPage.map(this::buildOrderSummaryResponse);
     }
 
@@ -111,9 +94,7 @@ public class OrderServiceImpl implements OrderService {
     public Page<OrderSummaryResponse> getAllOrdersForAdmin(String phoneNumber, OrderStatus status,
                                                            String search, Pageable pageable) {
         log.debug("Fetching orders for admin with filters");
-
         Page<Order> orderPage;
-
         if (StringUtils.hasText(search)) {
             orderPage = orderRepository.findOrdersWithFiltersAndSearch(
                     StringUtils.hasText(phoneNumber) ? phoneNumber.trim() : null,
@@ -132,14 +113,12 @@ public class OrderServiceImpl implements OrderService {
                 orderPage = orderRepository.findAllByOrderByCreatedAtDesc(pageable);
             }
         }
-
         return orderPage.map(this::buildOrderSummaryResponse);
     }
 
     @Override
     public OrderResponse updateOrderStatus(String orderId, UpdateOrderStatusRequest updateRequest, boolean isAdmin) {
         log.debug("Updating order status for ID: {} to status: {}", orderId, updateRequest.getStatus());
-
         if (updateRequest.getStatus() == OrderStatus.CANCELLED) {
             throw new ResponseStatusException(
                     HttpStatus.BAD_REQUEST,
@@ -148,8 +127,8 @@ public class OrderServiceImpl implements OrderService {
         }
 
         Order order = findOrderById(orderId);
+        OrderStatus previousStatus = order.getStatus();
         validateStatusTransition(order, updateRequest.getStatus(), isAdmin);
-
         order.updateStatus(updateRequest.getStatus(), updateRequest.getRemarks(), isAdmin);
         if (StringUtils.hasText(updateRequest.getRemarks()) && isAdmin) {
             order.setAdminRemarks(updateRequest.getRemarks());
@@ -157,19 +136,19 @@ public class OrderServiceImpl implements OrderService {
 
         Order updatedOrder = orderRepository.save(order);
 
-        redisEventService.publishOrderStatusChangeEvent(
+        telemetryClientService.publishOrderStatusChangeEvent(
                 orderId,
                 order.getUser().getId().toString(),
                 updateRequest.getStatus().toString()
         );
 
         if (isAdmin) {
-            redisEventService.publishOrderUpdateEventForAdmin(
+            telemetryClientService.publishOrderUpdateEventForAdmin(
                     orderId,
                     "STATUS_CHANGE",
                     Map.of(
                             "newStatus", updateRequest.getStatus().toString(),
-                            "previousStatus", order.getStatus().toString()
+                            "previousStatus", previousStatus.toString()
                     )
             );
         }
@@ -181,7 +160,6 @@ public class OrderServiceImpl implements OrderService {
     @Override
     public OrderResponse cancelOrder(String orderId, String userId, String remarks) {
         log.debug("User cancelling order ID: {} with remarks: {}", orderId, remarks);
-
         UUID userUuid = parseUUID(userId, "Invalid user ID format");
         Order order = findOrderByIdAndUserId(orderId, userUuid);
 
@@ -195,13 +173,13 @@ public class OrderServiceImpl implements OrderService {
         order.updateStatus(OrderStatus.CANCELLED, remarks, false);
         Order cancelledOrder = orderRepository.save(order);
 
-        redisEventService.publishOrderStatusChangeEvent(
+        telemetryClientService.publishOrderStatusChangeEvent(
                 orderId,
                 userId,
                 OrderStatus.CANCELLED.toString()
         );
 
-        redisEventService.publishOrderUpdateEventForAdmin(
+        telemetryClientService.publishOrderUpdateEventForAdmin(
                 orderId,
                 "USER_CANCELLATION",
                 Map.of(
@@ -218,7 +196,6 @@ public class OrderServiceImpl implements OrderService {
     @Override
     public OrderResponse cancelOrderByAdmin(String orderId, String remarks) {
         log.debug("Admin cancelling order ID: {} with remarks: {}", orderId, remarks);
-
         Order order = findOrderById(orderId);
 
         if (order.isCancelled()) {
@@ -232,13 +209,13 @@ public class OrderServiceImpl implements OrderService {
 
         Order cancelledOrder = orderRepository.save(order);
 
-        redisEventService.publishOrderStatusChangeEvent(
+        telemetryClientService.publishOrderStatusChangeEvent(
                 orderId,
                 order.getUser().getId().toString(),
                 OrderStatus.CANCELLED.toString()
         );
 
-        redisEventService.publishOrderUpdateEventForAdmin(
+        telemetryClientService.publishOrderUpdateEventForAdmin(
                 orderId,
                 "ADMIN_CANCELLATION",
                 Map.of(
@@ -254,23 +231,18 @@ public class OrderServiceImpl implements OrderService {
     @Override
     public void deleteOrder(String orderId) {
         log.debug("Deleting order with ID: {}", orderId);
-
         Order order = findOrderById(orderId);
         orderRepository.delete(order);
-
         log.info("Order deleted successfully with ID: {}", orderId);
     }
 
     @Override
     public Map<String, Object> buyAgain(BuyAgainRequest buyAgainRequest, String userId) {
         log.debug("Processing buy again request for order: {} by user: {}", buyAgainRequest.getOrderId(), userId);
-
         UUID userUuid = parseUUID(userId, "Invalid user ID format");
         Order order = findOrderByIdAndUserId(buyAgainRequest.getOrderId(), userUuid);
-
         Cart cart = findOrCreateUserCart(userUuid);
         int itemsAdded = 0;
-
         for (OrderItem orderItem : order.getOrderItems()) {
             try {
                 addToCart(cart, orderItem.getProduct(), orderItem.getQuantity());
@@ -280,12 +252,10 @@ public class OrderServiceImpl implements OrderService {
                         orderItem.getProductSku(), e.getMessage());
             }
         }
-
         Map<String, Object> response = new HashMap<>();
         response.put("cart_id", cart.getId().toString());
         response.put("items_added", itemsAdded);
         response.put("total_items_requested", order.getOrderItems().size());
-
         log.info("Buy again completed for order: {} - {} items added to cart", order.getId(), itemsAdded);
         return response;
     }
@@ -294,7 +264,6 @@ public class OrderServiceImpl implements OrderService {
     @Transactional(readOnly = true)
     public AdminOrderStatistics getOrderStatistics() {
         log.debug("Fetching order statistics");
-
         return AdminOrderStatistics.builder()
                 .totalOrders(orderRepository.count())
                 .placedOrders(orderRepository.countByStatus(OrderStatus.PLACED))
@@ -310,9 +279,7 @@ public class OrderServiceImpl implements OrderService {
     @Transactional(readOnly = true)
     public UserOrderStatistics getUserOrderStatistics(String userId) {
         log.debug("Fetching order statistics for user: {}", userId);
-
         UUID userUuid = parseUUID(userId, "Invalid user ID format");
-
         return UserOrderStatistics.builder()
                 .totalOrders(orderRepository.countByUserId(userUuid))
                 .placedOrders(orderRepository.countByUserIdAndStatus(userUuid, OrderStatus.PLACED))
@@ -364,7 +331,6 @@ public class OrderServiceImpl implements OrderService {
         if (cart.getCartItems().isEmpty()) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Cart is empty");
         }
-
         for (CartItem cartItem : cart.getCartItems()) {
             if (!cartItem.getProduct().getIsActive()) {
                 throw new ResponseStatusException(
@@ -386,10 +352,8 @@ public class OrderServiceImpl implements OrderService {
         order.setPincode(createRequest.getPincode());
         order.setStatus(OrderStatus.PLACED);
         order.setStatusUpdatedAt(LocalDateTime.now());
-
         BigDecimal totalAmount = BigDecimal.ZERO;
         int totalItems = 0;
-
         for (CartItem cartItem : cart.getCartItems()) {
             OrderItem orderItem = new OrderItem(
                     cartItem.getProduct(),
@@ -397,17 +361,13 @@ public class OrderServiceImpl implements OrderService {
                     cartItem.getPriceAtTime()
             );
             order.addOrderItem(orderItem);
-
             totalAmount = totalAmount.add(orderItem.getTotalPrice());
             totalItems += cartItem.getQuantity();
         }
-
         order.setTotalAmount(totalAmount);
         order.setTotalItems(totalItems);
-
         Order savedOrder = orderRepository.save(order);
         savedOrder.updateStatus(OrderStatus.PLACED, "Order placed successfully", false);
-
         return orderRepository.save(savedOrder);
     }
 
@@ -431,21 +391,17 @@ public class OrderServiceImpl implements OrderService {
                             cart.addCartItem(newItem);
                         }
                 );
-
         cartRepository.save(cart);
     }
 
     private void validateStatusTransition(Order order, OrderStatus newStatus, boolean isAdmin) {
         OrderStatus currentStatus = order.getStatus();
-
         if (currentStatus == newStatus) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Order is already in " + newStatus + " status");
         }
-
         if (currentStatus == OrderStatus.CANCELLED || currentStatus == OrderStatus.DELIVERED) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Cannot change status from " + currentStatus);
         }
-
         if (!isAdmin && newStatus != OrderStatus.CANCELLED) {
             throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Only admin can change status to " + newStatus);
         }
@@ -507,7 +463,6 @@ public class OrderServiceImpl implements OrderService {
                         orderItem.getProductSku(), e.getMessage());
             }
         }
-
         return OrderItemResponse.builder()
                 .orderItemId(orderItem.getId().toString())
                 .productId(orderItem.getProduct().getId().toString())
