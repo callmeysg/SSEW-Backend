@@ -23,6 +23,7 @@ func SetupRoutes(router *gin.Engine, eventService service.EventService) {
 	pollingController := controllers.NewPollingController(eventService)
 
 	router.GET("/health", pollingController.HealthCheck)
+	router.HEAD("/health", pollingController.HealthCheck)
 
 	v1 := router.Group("/v1")
 	{
