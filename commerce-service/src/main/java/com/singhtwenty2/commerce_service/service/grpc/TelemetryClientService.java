@@ -11,99 +11,13 @@
  */
 package com.singhtwenty2.commerce_service.service.grpc;
 
-import com.google.protobuf.Struct;
-import com.singhtwenty2.commerce_service.grpc.PublishNewOrderRequest;
-import com.singhtwenty2.commerce_service.grpc.PublishOrderStatusChangeRequest;
-import com.singhtwenty2.commerce_service.grpc.PublishOrderUpdateRequest;
-import com.singhtwenty2.commerce_service.grpc.TelemetryServiceGrpc;
-import io.grpc.ManagedChannel;
-import io.grpc.ManagedChannelBuilder;
-import jakarta.annotation.PostConstruct;
-import jakarta.annotation.PreDestroy;
-import lombok.extern.slf4j.Slf4j;
-import org.springframework.beans.factory.annotation.Value;
-import org.springframework.stereotype.Service;
-
 import java.util.Map;
-import java.util.concurrent.TimeUnit;
 
-@Service
-@Slf4j
-public class TelemetryClientService {
+public interface TelemetryClientService {
 
-    private ManagedChannel channel;
-    private TelemetryServiceGrpc.TelemetryServiceBlockingStub blockingStub;
+    void publishOrderStatusChangeEvent(String orderId, String userId, String newStatus);
 
-    @Value("${grpc.telemetry-service.host}")
-    private String host;
+    void publishNewOrderEventForAdmin(String orderId, String customerName, String totalAmount);
 
-    @Value("${grpc.telemetry-service.port}")
-    private int port;
-
-    @PostConstruct
-    private void init() {
-        log.info("Initializing gRPC client for Telemetry Service at {}:{}", host, port);
-        channel = ManagedChannelBuilder.forAddress(host, port)
-                .usePlaintext()
-                .build();
-        blockingStub = TelemetryServiceGrpc.newBlockingStub(channel);
-    }
-
-    public void publishOrderStatusChangeEvent(String orderId, String userId, String newStatus) {
-        try {
-            log.debug("gRPC -> Publishing OrderStatusChange event for order {}", orderId);
-            PublishOrderStatusChangeRequest request = PublishOrderStatusChangeRequest.newBuilder()
-                    .setOrderId(orderId)
-                    .setUserId(userId)
-                    .setNewStatus(newStatus)
-                    .build();
-            var ignored = blockingStub.publishOrderStatusChange(request);
-        } catch (Exception e) {
-            log.error("Failed to send gRPC OrderStatusChange event for order {}: {}", orderId, e.getMessage());
-        }
-    }
-
-    public void publishNewOrderEventForAdmin(String orderId, String customerName, String totalAmount) {
-        try {
-            log.debug("gRPC -> Publishing NewOrder event for order {}", orderId);
-            PublishNewOrderRequest request = PublishNewOrderRequest.newBuilder()
-                    .setOrderId(orderId)
-                    .setCustomerName(customerName)
-                    .setTotalAmount(totalAmount)
-                    .build();
-            var ignored = blockingStub.publishNewOrder(request);
-        } catch (Exception e) {
-            log.error("Failed to send gRPC NewOrder event for order {}: {}", orderId, e.getMessage());
-        }
-    }
-
-    public void publishOrderUpdateEventForAdmin(String orderId, String updateType, Map<String, Object> details) {
-        try {
-            log.debug("gRPC -> Publishing OrderUpdate event for order {}", orderId);
-
-            Struct.Builder detailsStructBuilder = Struct.newBuilder();
-            for (Map.Entry<String, Object> entry : details.entrySet()) {
-                if (entry.getValue() instanceof String) {
-                    detailsStructBuilder.putFields(entry.getKey(), com.google.protobuf.Value.newBuilder().setStringValue((String) entry.getValue()).build());
-                }
-            }
-
-            PublishOrderUpdateRequest request = PublishOrderUpdateRequest.newBuilder()
-                    .setOrderId(orderId)
-                    .setUpdateType(updateType)
-                    .setDetails(detailsStructBuilder.build())
-                    .build();
-            var ignored = blockingStub.publishOrderUpdate(request);
-        } catch (Exception e) {
-            log.error("Failed to send gRPC OrderUpdate event for order {}: {}", orderId, e.getMessage());
-        }
-    }
-
-    @PreDestroy
-    private void shutdown() throws InterruptedException {
-        log.info("Shutting down gRPC client for Telemetry Service");
-        if (channel != null) {
-            channel.shutdown().awaitTermination(5, TimeUnit.SECONDS);
-        }
-    }
+    void publishOrderUpdateEventForAdmin(String orderId, String updateType, Map<String, Object> details);
 }
