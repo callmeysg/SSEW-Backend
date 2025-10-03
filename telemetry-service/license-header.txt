@@ -1,0 +1,9 @@
+Copyright {{.Year}} {{.Holder}}
+Developer: Aryan Singh (@singhtwenty2)
+Portfolio: https://singhtwenty2.pages.dev/
+This file is part of SSEW E-commerce Backend System
+Licensed under MIT License
+For commercial use and inquiries: aryansingh.corp@gmail.com
+@author Aryan Singh (@singhtwenty2)
+@project SSEW E-commerce Backend System
+@since {{.Year}}
