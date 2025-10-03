@@ -132,6 +132,7 @@ func (s *eventService) GetEventsByType(ctx context.Context, eventType enums.Poll
 	if eventType == enums.CustomerOrderStatus && userId != "" {
 		key = UserEventKeyPrefix + userId
 	}
+
 	return s.repo.GetEventsByType(ctx, key, string(eventType), lastEventId, config.AppConfig.MaxEventsPerPoll)
 }
 
@@ -209,7 +210,8 @@ func (s *eventService) saveEventAsync(ctx context.Context, key string, event *mo
 				<-s.workerPool
 				s.wg.Done()
 			}()
-			if err := s.repo.SaveEvent(ctx, key, event); err != nil {
+
+			if err := s.repo.SaveEvent(context.Background(), key, event); err != nil {
 				log.Printf("Failed to save event: %v", err)
 			}
 		}()
