@@ -43,14 +43,14 @@ services:
       - ssew-network
     restart: unless-stopped
     healthcheck:
-      test: [ "CMD", "redis-cli", "--raw", "incr", "ping" ]
+      test: [ "CMD", "redis-cli", "-a", "${REDIS_PASSWORD:-redis_password}", "ping" ]
       interval: 10s
       timeout: 3s
       retries: 5
 
-  app:
-    image: singhtwenty2/ssew-commerce-service:${IMAGE_TAG:-latest}
-    container_name: ssew-app
+  commerce-service:
+    image: singhtwenty2/ssew-commerce-service:${COMMERCE_IMAGE_TAG:-latest}
+    container_name: ssew-commerce-service
     ports:
       - "9000:9000"
     environment:
@@ -59,10 +59,12 @@ services:
       SPRING_DATASOURCE_USERNAME: ${POSTGRES_USER:-ssew_owner}
       SPRING_DATASOURCE_PASSWORD: ${POSTGRES_PASSWORD:-ssew_password}
       SPRING_DATA_REDIS_URL: redis://:${REDIS_PASSWORD:-redis_password}@redis:6379
-      AWS_REGION: ${AWS_REGION:-ap-south-1}
-      AWS_S3_TEMP_BUCKET: ${AWS_S3_TEMP_BUCKET:-ssew-bucket-staging}
-      AWS_S3_TEMP_FOLDER: ${AWS_S3_TEMP_FOLDER:-temp}
-      AWS_S3_PERMANENT_FOLDER: ${AWS_S3_PERMANENT_FOLDER:-permanent}
+      GRPC_TELEMETRY-SERVICE_HOST: telemetry-service
+      GRPC_TELEMETRY-SERVICE_PORT: 9002
+      AWS_REGION: ${AWS_REGION}
+      AWS_S3_TEMP_BUCKET: ${AWS_S3_TEMP_BUCKET}
+      AWS_S3_TEMP_FOLDER: ${AWS_S3_TEMP_FOLDER}
+      AWS_S3_PERMANENT_FOLDER: ${AWS_S3_PERMANENT_FOLDER}
       AWS_ACCESS_KEY_ID: ${AWS_ACCESS_KEY_ID}
       AWS_SECRET_ACCESS_KEY: ${AWS_SECRET_ACCESS_KEY}
       JWT_SECRET: ${JWT_SECRET}
@@ -82,6 +84,30 @@ services:
       timeout: 10s
       retries: 3
       start_period: 40s
+
+  telemetry-service:
+    image: singhtwenty2/ssew-telemetry-service:${TELEMETRY_IMAGE_TAG:-latest}
+    container_name: ssew-telemetry-service
+    ports:
+      - "9001:9001"
+      - "9002:9002"
+    environment:
+      ENVIRONMENT: staging
+      PORT: 9001
+      REDIS_URL: redis://default:${REDIS_PASSWORD:-redis_password}@redis:6379/0
+      JWT_SECRET: ${JWT_SECRET}
+    depends_on:
+      redis:
+        condition: service_healthy
+    networks:
+      - ssew-network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost:9001/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 20s
 
 volumes:
   postgres_data:

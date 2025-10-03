@@ -1,11 +1,11 @@
-name: Deploy Commerce Service to EC2
+name: Deploy Telemetry Service to EC2
 
 on:
   push:
     branches: [ main ]
     paths:
-      - 'commerce-service/**'
-      - '.github/workflows/deploy.yml'
+      - 'telemetry-service/**'
+      - '.github/workflows/deploy-telemetry.yml'
   workflow_dispatch:
     inputs:
       fresh_deploy:
@@ -13,43 +13,41 @@ on:
         required: false
         default: 'false'
         type: choice
-        options:
-          - 'false'
-          - 'true'
+        options: ['false', 'true']
 
 env:
   REGISTRY: docker.io
-  IMAGE_NAME: singhtwenty2/ssew-commerce-service
+  IMAGE_NAME: singhtwenty2/ssew-telemetry-service
 
 jobs:
-  build-and-deploy:
+  build-and-deploy-telemetry:
     runs-on: ubuntu-latest
     defaults:
       run:
-        working-directory: ./commerce-service
+        working-directory: ./telemetry-service
 
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
 
-      - name: Set up JDK 21
-        uses: actions/setup-java@v4
+      - name: Set up Go
+        uses: actions/setup-go@v5
         with:
-          java-version: '21'
-          distribution: 'temurin'
+          go-version: '1.21' # Match the version in your Dockerfile
 
-      - name: Cache Maven dependencies
-        uses: actions/cache@v3
-        with:
-          path: ~/.m2
-          key: ${{ runner.os }}-m2-${{ hashFiles('**/pom.xml') }}
-          restore-keys: ${{ runner.os }}-m2
+      - name: Install addlicense
+        run: go install github.com/google/addlicense@latest
 
       - name: Validate code attribution headers
-        run: mvn license:check
-
-      - name: Build with Maven
-        run: mvn clean package -DskipTests
+        run: |
+          echo "🔍 Validating Go code attribution headers..."
+          make check-license
+          if [ $? -ne 0 ]; then
+            echo "❌ Some Go files are missing proper attribution headers!"
+            echo "💡 Run 'make license' locally to add missing headers."
+            exit 1
+          fi
+          echo "✅ All Go files have proper attribution headers!"
 
       - name: Generate build number
         id: build-number
@@ -65,14 +63,15 @@ jobs:
       - name: Build and push Docker image
         uses: docker/build-push-action@v5
         with:
-          context: ./commerce-service
+          context: ./telemetry-service
+          file: ./telemetry-service/Dockerfile
           platforms: linux/amd64
           push: true
           tags: |
             ${{ env.IMAGE_NAME }}:staging-${{ steps.build-number.outputs.BUILD_NUMBER }}
             ${{ env.IMAGE_NAME }}:staging-latest
 
-      - name: Deploy to EC2
+      - name: Deploy Telemetry Service to EC2
         uses: appleboy/ssh-action@v1.0.0
         with:
           host: ${{ secrets.EC2_HOST }}
@@ -81,43 +80,58 @@ jobs:
           script: |
             mkdir -p /home/ubuntu/ssew-deployment
             cd /home/ubuntu/ssew-deployment
-            
+
+            # Always fetch the latest docker-compose file
             curl -o docker-compose.yml https://raw.githubusercontent.com/${{ github.repository }}/main/docker-compose.yml
-            
+
+            # Create/update .env file with secrets for ALL services
             cat > .env << EOF
-            COMMERCE_IMAGE_TAG=staging-${{ steps.build-number.outputs.BUILD_NUMBER }}
-            TELEMETRY_IMAGE_TAG=${{ secrets.TELEMETRY_IMAGE_TAG || 'staging-latest' }}
+            # Commerce Service Tag (keep existing or use latest)
+            COMMERCE_IMAGE_TAG=${{ secrets.COMMERCE_IMAGE_TAG || 'staging-latest' }}
+            # Telemetry Service Tag (use the new build)
+            TELEMETRY_IMAGE_TAG=staging-${{ steps.build-number.outputs.BUILD_NUMBER }}
+
+            # Shared Secrets
+            JWT_SECRET=${{ secrets.JWT_SECRET }}
+            REDIS_PASSWORD=redis_staging_pass
+
+            # Commerce Service Secrets
             AWS_ACCESS_KEY_ID=${{ secrets.AWS_ACCESS_KEY_ID }}
             AWS_SECRET_ACCESS_KEY=${{ secrets.AWS_SECRET_ACCESS_KEY }}
-            JWT_SECRET=${{ secrets.JWT_SECRET }}
             APP_DEVELOPER_SECRET=${{ secrets.APP_DEVELOPER_SECRET }}
             SENTRY_AUTH_TOKEN=${{ secrets.SENTRY_AUTH_TOKEN }}
             POSTGRES_DB=ssew
             POSTGRES_USER=ssew_owner
             POSTGRES_PASSWORD=ssew_staging_pass
-            REDIS_PASSWORD=redis_staging_pass
             AWS_REGION=ap-south-1
             AWS_S3_TEMP_BUCKET=ssew-bucket-staging
             AWS_S3_TEMP_FOLDER=temp
             AWS_S3_PERMANENT_FOLDER=permanent
             EOF
-            
+
             chmod 600 .env
-            
+
             FRESH_DEPLOY="${{ github.event.inputs.fresh_deploy || 'false' }}"
-            
+
             if [ "$FRESH_DEPLOY" = "true" ]; then
+              echo "🔥 Fresh deployment requested - removing all containers and data"
               docker-compose down -v
             else
-              docker-compose stop commerce-service 2>/dev/null || true
-              docker rm -f ssew-commerce-service 2>/dev/null || true
+              echo "🔄 Incremental deployment - updating telemetry-service"
+              docker-compose stop telemetry-service 2>/dev/null || true
+              docker rm -f ssew-telemetry-service 2>/dev/null || true
             fi
-            
+
+            # Prune old images to save space
             docker image prune -f
-            
-            docker-compose pull commerce-service
-            
+
+            # Pull the new image for the service we're deploying
+            docker-compose pull telemetry-service
+
+            # Start everything up. Docker Compose is smart enough to
+            # only (re)create containers that have changed or are not running.
             docker-compose up -d
-            
-            echo "Deployment script finished. Current service status:"
+
+            echo "✅ Deployment script finished."
+            echo "📊 Current service status:"
             docker-compose ps
