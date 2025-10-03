@@ -1,4 +1,4 @@
-FROM golang:1.21-alpine AS builder
+FROM golang:1.24.5-alpine AS builder
 
 RUN apk add --no-cache git
 
@@ -13,12 +13,13 @@ RUN CGO_ENABLED=0 GOOS=linux go build -a -installsuffix cgo -o main cmd/server/m
 
 FROM alpine:latest
 
-RUN apk --no-cache add ca-certificates
+RUN apk --no-cache add ca-certificates wget
 
 WORKDIR /root/
 
 COPY --from=builder /app/main .
 
-EXPOSE 8081
+EXPOSE 9001
+EXPOSE 9002
 
 CMD ["./main"]

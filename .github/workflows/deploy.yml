@@ -13,9 +13,7 @@ on:
         required: false
         default: 'false'
         type: choice
-        options:
-          - 'false'
-          - 'true'
+        options: ['false', 'true']
 
 env:
   REGISTRY: docker.io
@@ -87,19 +85,38 @@ jobs:
             cat > .env << EOF
             COMMERCE_IMAGE_TAG=staging-${{ steps.build-number.outputs.BUILD_NUMBER }}
             TELEMETRY_IMAGE_TAG=${{ secrets.TELEMETRY_IMAGE_TAG || 'staging-latest' }}
+            
+            # Shared Secrets
+            JWT_SECRET=${{ secrets.JWT_SECRET }}
+            REDIS_PASSWORD=redis_staging_pass
+            
+            # Commerce Service Secrets
             AWS_ACCESS_KEY_ID=${{ secrets.AWS_ACCESS_KEY_ID }}
             AWS_SECRET_ACCESS_KEY=${{ secrets.AWS_SECRET_ACCESS_KEY }}
-            JWT_SECRET=${{ secrets.JWT_SECRET }}
             APP_DEVELOPER_SECRET=${{ secrets.APP_DEVELOPER_SECRET }}
             SENTRY_AUTH_TOKEN=${{ secrets.SENTRY_AUTH_TOKEN }}
             POSTGRES_DB=ssew
             POSTGRES_USER=ssew_owner
             POSTGRES_PASSWORD=ssew_staging_pass
-            REDIS_PASSWORD=redis_staging_pass
             AWS_REGION=ap-south-1
             AWS_S3_TEMP_BUCKET=ssew-bucket-staging
             AWS_S3_TEMP_FOLDER=temp
             AWS_S3_PERMANENT_FOLDER=permanent
+            
+            # Telemetry Service Environment Variables
+            ENVIRONMENT=staging
+            LOG_LEVEL=debug
+            CORS_ALLOWED_ORIGINS=http://localhost:3000,https://ssew-dashboard.pages.dev,https://srishastabangalore.in,https://dash.srishastabangalore.in,https://www.srishastabangalore.in
+            CORS_ALLOWED_METHODS=GET,POST,PUT,DELETE,PATCH,OPTIONS,HEAD
+            CORS_ALLOWED_HEADERS=Authorization,Content-Type,X-Requested-With,Accept,Origin,Access-Control-Request-Method,Access-Control-Request-Headers
+            MAX_EVENTS_PER_POLL=50
+            DEFAULT_TTL_SECONDS=300
+            SHORT_POLL_INTERVAL_MS=5000
+            LONG_POLL_INTERVAL_MS=30000
+            LONG_POLL_TIMEOUT_MS=25000
+            WORKER_POOL_SIZE=100
+            REDIS_POOL_SIZE=50
+            REDIS_MIN_IDLE_CONNS=10
             EOF
             
             chmod 600 .env
