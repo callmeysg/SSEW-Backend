@@ -96,7 +96,7 @@ jobs:
             AWS_S3_TEMP_FOLDER=temp
             AWS_S3_PERMANENT_FOLDER=permanent
             MAIL_USERNAME=${{ secrets.MAIL_USERNAME }}
-            MAIL_PASSWORD="${{ secrets.MAIL_PASSWORD }}"
+            MAIL_PASSWORD=${{ secrets.MAIL_PASSWORD }}
             ENVIRONMENT=staging
             LOG_LEVEL=debug
             CORS_ALLOWED_ORIGINS=http://localhost:3000,https://ssew-dashboard.pages.dev,https://srishastabangalore.in,https://dash.srishastabangalore.in,https://www.srishastabangalore.in
