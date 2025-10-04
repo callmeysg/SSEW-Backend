@@ -29,29 +29,23 @@ jobs:
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
-
       - name: Set up Go
         uses: actions/setup-go@v5
         with:
           go-version: '1.24.5'
-
       - name: Install addlicense
         run: go install github.com/google/addlicense@latest
-
       - name: Validate code attribution headers
         run: make check-license
-
       - name: Generate build number
         id: build-number
         run: echo "BUILD_NUMBER=$(date +%Y%m%d)-${GITHUB_SHA:0:7}" >> $GITHUB_OUTPUT
         working-directory: .
-
       - name: Login to Docker Hub
         uses: docker/login-action@v3
         with:
           username: ${{ secrets.DOCKER_USERNAME }}
           password: ${{ secrets.DOCKER_PASSWORD }}
-
       - name: Build and push Docker image
         uses: docker/build-push-action@v5
         with:
@@ -70,20 +64,16 @@ jobs:
           username: ${{ secrets.EC2_USER }}
           key: ${{ secrets.EC2_SSH_KEY }}
           script: |
-            mkdir -p /home/ubuntu/ssew-deployment
+            set -e
             cd /home/ubuntu/ssew-deployment
-
+            
             curl -o docker-compose.yml https://raw.githubusercontent.com/${{ github.repository }}/main/docker-compose.yml
-
+            
             cat > .env << EOF
             COMMERCE_IMAGE_TAG=${{ secrets.COMMERCE_IMAGE_TAG || 'staging-latest' }}
             TELEMETRY_IMAGE_TAG=staging-${{ steps.build-number.outputs.BUILD_NUMBER }}
-
-            # Shared Secrets
             JWT_SECRET=${{ secrets.JWT_SECRET }}
             REDIS_PASSWORD=redis_staging_pass
-            
-            # Commerce Service Secrets
             AWS_ACCESS_KEY_ID=${{ secrets.AWS_ACCESS_KEY_ID }}
             AWS_SECRET_ACCESS_KEY=${{ secrets.AWS_SECRET_ACCESS_KEY }}
             APP_DEVELOPER_SECRET=${{ secrets.APP_DEVELOPER_SECRET }}
@@ -95,8 +85,6 @@ jobs:
             AWS_S3_TEMP_BUCKET=ssew-bucket-staging
             AWS_S3_TEMP_FOLDER=temp
             AWS_S3_PERMANENT_FOLDER=permanent
-            
-            # Telemetry Service Environment Variables
             ENVIRONMENT=staging
             LOG_LEVEL=debug
             CORS_ALLOWED_ORIGINS=http://localhost:3000,https://ssew-dashboard.pages.dev,https://srishastabangalore.in,https://dash.srishastabangalore.in,https://www.srishastabangalore.in
@@ -112,23 +100,21 @@ jobs:
             REDIS_MIN_IDLE_CONNS=10
             EOF
 
-            chmod 600 .env
-
             FRESH_DEPLOY="${{ github.event.inputs.fresh_deploy || 'false' }}"
-
+            
             if [ "$FRESH_DEPLOY" = "true" ]; then
-              echo "🔥 Fresh deployment requested - removing all containers and data"
+              echo "🔥 Fresh deployment requested - removing all data and containers"
               docker-compose down -v
-            else
-              echo "🔄 Incremental deployment - updating telemetry-service"
-              docker-compose stop telemetry-service 2>/dev/null || true
-              docker rm -f ssew-telemetry-service 2>/dev/null || true
             fi
 
-            docker image prune -f
+            echo " pulling latest telemetry-service image..."
             docker-compose pull telemetry-service
-            docker-compose up -d
 
-            echo "✅ Deployment script finished."
-            echo "📊 Current service status:"
+            echo " recreating telemetry-service container..."
+            docker-compose up -d --force-recreate --no-deps telemetry-service
+
+            echo " removing old/unused docker images..."
+            docker image prune -af
+
+            echo "✅ Deployment complete. Current status:"
             docker-compose ps

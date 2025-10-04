@@ -29,37 +29,30 @@ jobs:
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
-
       - name: Set up JDK 21
         uses: actions/setup-java@v4
         with:
           java-version: '21'
           distribution: 'temurin'
-
       - name: Cache Maven dependencies
         uses: actions/cache@v3
         with:
           path: ~/.m2
           key: ${{ runner.os }}-m2-${{ hashFiles('**/pom.xml') }}
           restore-keys: ${{ runner.os }}-m2
-
       - name: Validate code attribution headers
         run: mvn license:check
-
       - name: Build with Maven
         run: mvn clean package -DskipTests
-
       - name: Generate build number
         id: build-number
         run: echo "BUILD_NUMBER=$(date +%Y%m%d)-${GITHUB_SHA:0:7}" >> $GITHUB_OUTPUT
         working-directory: .
-
       - name: Login to Docker Hub
         uses: docker/login-action@v3
         with:
           username: ${{ secrets.DOCKER_USERNAME }}
           password: ${{ secrets.DOCKER_PASSWORD }}
-
       - name: Build and push Docker image
         uses: docker/build-push-action@v5
         with:
@@ -70,14 +63,14 @@ jobs:
             ${{ env.IMAGE_NAME }}:staging-${{ steps.build-number.outputs.BUILD_NUMBER }}
             ${{ env.IMAGE_NAME }}:staging-latest
 
-      - name: Deploy to EC2
+      - name: Deploy Commerce Service to EC2
         uses: appleboy/ssh-action@v1.0.0
         with:
           host: ${{ secrets.EC2_HOST }}
           username: ${{ secrets.EC2_USER }}
           key: ${{ secrets.EC2_SSH_KEY }}
           script: |
-            mkdir -p /home/ubuntu/ssew-deployment
+            set -e
             cd /home/ubuntu/ssew-deployment
             
             curl -o docker-compose.yml https://raw.githubusercontent.com/${{ github.repository }}/main/docker-compose.yml
@@ -85,12 +78,8 @@ jobs:
             cat > .env << EOF
             COMMERCE_IMAGE_TAG=staging-${{ steps.build-number.outputs.BUILD_NUMBER }}
             TELEMETRY_IMAGE_TAG=${{ secrets.TELEMETRY_IMAGE_TAG || 'staging-latest' }}
-            
-            # Shared Secrets
             JWT_SECRET=${{ secrets.JWT_SECRET }}
             REDIS_PASSWORD=redis_staging_pass
-            
-            # Commerce Service Secrets
             AWS_ACCESS_KEY_ID=${{ secrets.AWS_ACCESS_KEY_ID }}
             AWS_SECRET_ACCESS_KEY=${{ secrets.AWS_SECRET_ACCESS_KEY }}
             APP_DEVELOPER_SECRET=${{ secrets.APP_DEVELOPER_SECRET }}
@@ -102,8 +91,6 @@ jobs:
             AWS_S3_TEMP_BUCKET=ssew-bucket-staging
             AWS_S3_TEMP_FOLDER=temp
             AWS_S3_PERMANENT_FOLDER=permanent
-            
-            # Telemetry Service Environment Variables
             ENVIRONMENT=staging
             LOG_LEVEL=debug
             CORS_ALLOWED_ORIGINS=http://localhost:3000,https://ssew-dashboard.pages.dev,https://srishastabangalore.in,https://dash.srishastabangalore.in,https://www.srishastabangalore.in
@@ -118,23 +105,22 @@ jobs:
             REDIS_POOL_SIZE=50
             REDIS_MIN_IDLE_CONNS=10
             EOF
-            
-            chmod 600 .env
-            
+
             FRESH_DEPLOY="${{ github.event.inputs.fresh_deploy || 'false' }}"
             
             if [ "$FRESH_DEPLOY" = "true" ]; then
+              echo "🔥 Fresh deployment requested - removing all data and containers"
               docker-compose down -v
-            else
-              docker-compose stop commerce-service 2>/dev/null || true
-              docker rm -f ssew-commerce-service 2>/dev/null || true
             fi
             
-            docker image prune -f
-            
+            echo " pulling latest commerce-service image..."
             docker-compose pull commerce-service
             
-            docker-compose up -d
+            echo " recreating commerce-service container..."
+            docker-compose up -d --force-recreate --no-deps commerce-service
             
-            echo "Deployment script finished. Current service status:"
+            echo " removing old/unused docker images..."
+            docker image prune -af
+            
+            echo "✅ Deployment complete. Current status:"
             docker-compose ps
