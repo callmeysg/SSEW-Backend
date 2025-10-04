@@ -50,7 +50,7 @@ spring:
     host: smtp.gmail.com
     port: 587
     username: ${MAIL_USERNAME}
-    password: "#{new String(T(java.util.Base64).getDecoder().decode('${MAIL_PASSWORD}'))}"
+    password: ${MAIL_PASSWORD}
     properties:
       mail:
         smtp:
