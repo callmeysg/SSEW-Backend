@@ -29,16 +29,17 @@ public interface RefreshTokenRepository extends JpaRepository<RefreshToken, UUID
 
     Optional<RefreshToken> findByToken(String token);
 
-    List<RefreshToken> findByUser(User user);
+    @Query("SELECT COUNT(rt) FROM RefreshToken rt WHERE rt.user = :user AND rt.isRevoked = false AND rt.expiresAt > :now")
+    Long countActiveTokensForUser(@Param("user") User user, @Param("now") LocalDateTime now);
+
+    @Query("SELECT rt FROM RefreshToken rt WHERE rt.user = :user AND rt.isRevoked = false AND rt.expiresAt > :now ORDER BY rt.createdAt DESC")
+    List<RefreshToken> findActiveTokensForUser(@Param("user") User user, @Param("now") LocalDateTime now);
 
     @Modifying
     @Query("UPDATE RefreshToken rt SET rt.isRevoked = true WHERE rt.user = :user")
     void revokeAllTokensForUser(@Param("user") User user);
 
     @Modifying
-    @Query("DELETE FROM RefreshToken rt WHERE rt.expiresAt < :now OR rt.isRevoked = true")
-    int deleteExpiredAndRevokedTokens(@Param("now") LocalDateTime now);
-
-    @Query("SELECT COUNT(rt) FROM RefreshToken rt WHERE rt.user = :user AND rt.isRevoked = false AND rt.expiresAt > :now")
-    Long countActiveTokensForUser(@Param("user") User user, @Param("now") LocalDateTime now);
+    @Query("DELETE FROM RefreshToken rt WHERE rt.isRevoked = true OR rt.expiresAt < :now")
+    void deleteExpiredAndRevokedTokens(@Param("now") LocalDateTime now);
 }

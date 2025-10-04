@@ -21,7 +21,7 @@ public class TokenDTO {
     @Builder
     @AllArgsConstructor
     @NoArgsConstructor
-    public static class RefreshTokenRequest {
+    public static class RotateTokenRequest {
         private String refreshTokenValue;
     }
 }

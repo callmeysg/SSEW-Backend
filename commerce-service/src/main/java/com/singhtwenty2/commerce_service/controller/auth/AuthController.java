@@ -11,13 +11,13 @@
  */
 package com.singhtwenty2.commerce_service.controller.auth;
 
-import com.singhtwenty2.commerce_service.data.dto.common.GlobalApiResponse;
-import com.singhtwenty2.commerce_service.data.dto.auth.AuthHealthResponse;
+import com.singhtwenty2.commerce_service.data.dto.auth.ProfileDTO.ProfileResponse;
+import com.singhtwenty2.commerce_service.data.dto.auth.ProfileDTO.UpdateProfileRequest;
 import com.singhtwenty2.commerce_service.data.dto.auth.RegisterDTO.RegisterRequest;
 import com.singhtwenty2.commerce_service.data.dto.auth.RegisterDTO.RegisterResponse;
+import com.singhtwenty2.commerce_service.data.dto.common.GlobalApiResponse;
 import com.singhtwenty2.commerce_service.security.PrincipalUser;
 import com.singhtwenty2.commerce_service.service.auth.AuthService;
-import com.singhtwenty2.commerce_service.service.health.AuthHealthService;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
@@ -33,7 +33,7 @@ import java.util.Map;
 
 import static com.singhtwenty2.commerce_service.data.dto.auth.LoginDTO.LoginRequest;
 import static com.singhtwenty2.commerce_service.data.dto.auth.LoginDTO.LoginResponse;
-import static com.singhtwenty2.commerce_service.data.dto.auth.TokenDTO.RefreshTokenRequest;
+import static com.singhtwenty2.commerce_service.data.dto.auth.TokenDTO.RotateTokenRequest;
 import static com.singhtwenty2.commerce_service.util.io.NetworkUtils.getClientIP;
 
 @RestController
@@ -43,7 +43,6 @@ import static com.singhtwenty2.commerce_service.util.io.NetworkUtils.getClientIP
 public class AuthController {
 
     private final AuthService authService;
-    private final AuthHealthService authHealthService;
 
     @Value("${app.security.developer-secret:}")
     private String developerSecret;
@@ -53,29 +52,20 @@ public class AuthController {
             @Valid @RequestBody RegisterRequest registerRequest,
             HttpServletRequest request
     ) {
-        long startTime = System.currentTimeMillis();
-        boolean success = false;
+        log.info("User Registration attempt from IP: {} for phone: {}",
+                getClientIP(request), registerRequest.getMobileNumber());
 
-        try {
-            log.info("User Registration attempt from IP: {} for phone: {}",
-                    getClientIP(request), registerRequest.getMobileNumber());
+        RegisterResponse response = authService.registerUser(registerRequest);
 
-            RegisterResponse response = authService.registerUser(registerRequest);
+        log.info("User registration successful for phone: {}", registerRequest.getMobileNumber());
 
-            log.info("User registration successful for phone: {}", registerRequest.getMobileNumber());
-            success = true;
-
-            return ResponseEntity.status(HttpStatus.CREATED).body(
-                    GlobalApiResponse.<RegisterResponse>builder()
-                            .success(true)
-                            .message("User registered successfully")
-                            .data(response)
-                            .build()
-            );
-        } finally {
-            double responseTime = System.currentTimeMillis() - startTime;
-            AuthHealthService.recordEndpointMetric("POST", "/v1/auth/register", success, responseTime);
-        }
+        return ResponseEntity.status(HttpStatus.CREATED).body(
+                GlobalApiResponse.<RegisterResponse>builder()
+                        .success(true)
+                        .message("User registered successfully")
+                        .data(response)
+                        .build()
+        );
     }
 
     @PostMapping("/register-admin")
@@ -84,151 +74,134 @@ public class AuthController {
             @RequestHeader(value = "X-FA8S-Secret") String encodedSecret,
             HttpServletRequest request
     ) {
-        long startTime = System.currentTimeMillis();
-        boolean success = false;
-
-        try {
-            if (encodedSecret == null || encodedSecret.trim().isEmpty()) {
-                log.warn("Admin registration attempt without secret from IP: {}", getClientIP(request));
-                return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
-                        .body(
-                                GlobalApiResponse.<RegisterResponse>builder()
-                                        .success(false)
-                                        .message("Secret header is required for admin registration.")
-                                        .data(null)
-                                        .build()
-                        );
-            }
-
-            String decodedSecret;
-            try {
-                decodedSecret = new String(Base64.getDecoder().decode(encodedSecret));
-            } catch (IllegalArgumentException e) {
-                log.warn("Admin registration attempt with invalid base64 secret from IP: {}", getClientIP(request));
-                return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
-                        .body(
-                                GlobalApiResponse.<RegisterResponse>builder()
-                                        .success(false)
-                                        .message("Invalid secret format. Please provide a valid secret.")
-                                        .data(null)
-                                        .build()
-                        );
-            }
-
-            if (!developerSecret.equals(decodedSecret)) {
-                log.warn("Admin registration attempt with wrong secret from IP: {} for phone: {}",
-                        getClientIP(request), registerRequest.getMobileNumber());
-                return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
-                        .body(
-                                GlobalApiResponse.<RegisterResponse>builder()
-                                        .success(false)
-                                        .message("Invalid secret provided for admin registration.")
-                                        .data(null)
-                                        .build()
-                        );
-            }
-
-            log.info("Admin registration attempt from IP: {} for phone: {}",
-                    getClientIP(request), registerRequest.getMobileNumber());
-
-            RegisterResponse response = authService.registerAdmin(registerRequest);
-
-            log.info("Admin registration successful for phone: {}", registerRequest.getMobileNumber());
-            success = true;
-
-            return ResponseEntity.status(HttpStatus.CREATED).body(
-                    GlobalApiResponse.<RegisterResponse>builder()
-                            .success(true)
-                            .message("Admin registered successfully")
-                            .data(response)
-                            .build()
-            );
-        } finally {
-            double responseTime = System.currentTimeMillis() - startTime;
-            AuthHealthService.recordEndpointMetric("POST", "/v1/auth/register-admin", success, responseTime);
+        if (encodedSecret == null || encodedSecret.trim().isEmpty()) {
+            log.warn("Admin registration attempt without secret from IP: {}", getClientIP(request));
+            return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
+                    .body(
+                            GlobalApiResponse.<RegisterResponse>builder()
+                                    .success(false)
+                                    .message("Secret header is required for admin registration.")
+                                    .data(null)
+                                    .build()
+                    );
         }
+
+        String decodedSecret;
+        try {
+            decodedSecret = new String(Base64.getDecoder().decode(encodedSecret));
+        } catch (IllegalArgumentException e) {
+            log.warn("Admin registration attempt with invalid base64 secret from IP: {}", getClientIP(request));
+            return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
+                    .body(
+                            GlobalApiResponse.<RegisterResponse>builder()
+                                    .success(false)
+                                    .message("Invalid secret format. Please provide a valid secret.")
+                                    .data(null)
+                                    .build()
+                    );
+        }
+
+        if (!developerSecret.equals(decodedSecret)) {
+            log.warn("Admin registration attempt with wrong secret from IP: {} for phone: {}",
+                    getClientIP(request), registerRequest.getMobileNumber());
+            return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
+                    .body(
+                            GlobalApiResponse.<RegisterResponse>builder()
+                                    .success(false)
+                                    .message("Invalid secret provided for admin registration.")
+                                    .data(null)
+                                    .build()
+                    );
+        }
+
+        log.info("Admin registration attempt from IP: {} for phone: {}",
+                getClientIP(request), registerRequest.getMobileNumber());
+
+        RegisterResponse response = authService.registerAdmin(registerRequest);
+
+        log.info("Admin registration successful for phone: {}", registerRequest.getMobileNumber());
+
+        return ResponseEntity.status(HttpStatus.CREATED).body(
+                GlobalApiResponse.<RegisterResponse>builder()
+                        .success(true)
+                        .message("Admin registered successfully")
+                        .data(response)
+                        .build()
+        );
     }
 
     @PostMapping("/login")
     public ResponseEntity<GlobalApiResponse<LoginResponse>> login(
             @Valid @RequestBody LoginRequest loginRequest,
             HttpServletRequest request) {
-        long startTime = System.currentTimeMillis();
-        boolean success = false;
+        log.info("User login attempt from IP: {} for phone: {}",
+                getClientIP(request), loginRequest.getMobileNumber());
 
-        try {
-            log.info("Login attempt from IP: {} for phone: {}",
-                    getClientIP(request), loginRequest.getMobileNumber());
+        LoginResponse response = authService.loginUser(loginRequest);
 
-            LoginResponse response = authService.login(loginRequest);
+        log.info("User login successful for phone: {}", loginRequest.getMobileNumber());
 
-            log.info("User login successful for phone: {}", loginRequest.getMobileNumber());
-            success = true;
-
-            return ResponseEntity.ok(
-                    GlobalApiResponse.<LoginResponse>builder()
-                            .success(true)
-                            .message("User logged in successfully")
-                            .data(response)
-                            .build()
-            );
-        } finally {
-            double responseTime = System.currentTimeMillis() - startTime;
-            AuthHealthService.recordEndpointMetric("POST", "/v1/auth/login", success, responseTime);
-        }
+        return ResponseEntity.ok(
+                GlobalApiResponse.<LoginResponse>builder()
+                        .success(true)
+                        .message("User logged in successfully")
+                        .data(response)
+                        .build()
+        );
     }
 
-    @PostMapping("/refresh-tokens")
-    public ResponseEntity<GlobalApiResponse<LoginResponse>> refreshToken(
-            @Valid @RequestBody RefreshTokenRequest refreshTokenRequest,
+    @PostMapping("/login-admin")
+    public ResponseEntity<GlobalApiResponse<LoginResponse>> loginAdmin(
+            @Valid @RequestBody LoginRequest loginRequest,
             HttpServletRequest request) {
-        long startTime = System.currentTimeMillis();
-        boolean success = false;
+        log.info("Admin login attempt from IP: {} for phone: {}",
+                getClientIP(request), loginRequest.getMobileNumber());
 
-        try {
-            log.debug("Token refresh attempt from IP: {}", getClientIP(request));
+        LoginResponse response = authService.loginAdmin(loginRequest);
 
-            LoginResponse response = authService.refreshToken(refreshTokenRequest);
-            success = true;
+        log.info("Admin login successful for phone: {}", loginRequest.getMobileNumber());
 
-            return ResponseEntity.ok(
-                    GlobalApiResponse.<LoginResponse>builder()
-                            .success(true)
-                            .message("Tokens refreshed successfully")
-                            .data(response)
-                            .build()
-            );
-        } finally {
-            double responseTime = System.currentTimeMillis() - startTime;
-            AuthHealthService.recordEndpointMetric("POST", "/v1/auth/rotate-tokens", success, responseTime);
-        }
+        return ResponseEntity.ok(
+                GlobalApiResponse.<LoginResponse>builder()
+                        .success(true)
+                        .message("Admin logged in successfully")
+                        .data(response)
+                        .build()
+        );
+    }
+
+    @PostMapping("/rotate-tokens")
+    public ResponseEntity<GlobalApiResponse<LoginResponse>> rotateTokens(
+            @Valid @RequestBody RotateTokenRequest rotateTokenRequest,
+            HttpServletRequest request) {
+        log.debug("Token rotation attempt from IP: {}", getClientIP(request));
+
+        LoginResponse response = authService.rotateTokens(rotateTokenRequest);
+
+        return ResponseEntity.ok(
+                GlobalApiResponse.<LoginResponse>builder()
+                        .success(true)
+                        .message("Tokens rotated successfully")
+                        .data(response)
+                        .build()
+        );
     }
 
     @PostMapping("/logout")
     public ResponseEntity<GlobalApiResponse<Map<String, Object>>> logout(
-            @Valid @RequestBody RefreshTokenRequest refreshTokenRequest,
+            @Valid @RequestBody RotateTokenRequest rotateTokenRequest,
             HttpServletRequest request) {
-        long startTime = System.currentTimeMillis();
-        boolean success = false;
+        log.info("Logout attempt from IP: {}", getClientIP(request));
 
-        try {
-            log.info("Logout attempt from IP: {}", getClientIP(request));
+        authService.logout(rotateTokenRequest);
 
-            authService.logout(refreshTokenRequest);
-
-            success = true;
-
-            return ResponseEntity.ok(
-                    GlobalApiResponse.<Map<String, Object>>builder()
-                            .success(true)
-                            .message("User logged out successfully")
-                            .data(null)
-                            .build()
-            );
-        } finally {
-            double responseTime = System.currentTimeMillis() - startTime;
-            AuthHealthService.recordEndpointMetric("POST", "/v1/auth/logout", success, responseTime);
-        }
+        return ResponseEntity.ok(
+                GlobalApiResponse.<Map<String, Object>>builder()
+                        .success(true)
+                        .message("User logged out successfully")
+                        .data(null)
+                        .build()
+        );
     }
 
     @PostMapping("/logout-all-devices")
@@ -236,55 +209,64 @@ public class AuthController {
             HttpServletRequest request,
             Authentication authentication
     ) {
-        long startTime = System.currentTimeMillis();
-        boolean success = false;
+        PrincipalUser user = (PrincipalUser) authentication.getPrincipal();
+        String userId = user.getUserId().toString();
 
-        try {
-            PrincipalUser user = (PrincipalUser) authentication.getPrincipal();
-            String userId = user.getUserId().toString();
+        log.info("Logout all devices attempt from IP: {} for user: {}", getClientIP(request), userId);
 
-            log.info("Logout all devices attempt from IP: {} for user: {}", getClientIP(request), userId);
+        authService.logoutAllDevices(userId);
 
-            authService.logoutAllDevices(userId);
-
-            success = true;
-
-            return ResponseEntity.ok(
-                    GlobalApiResponse.<Map<String, Object>>builder()
-                            .success(true)
-                            .message("User logged out from all devices successfully")
-                            .data(null)
-                            .build()
-            );
-        } finally {
-            double responseTime = System.currentTimeMillis() - startTime;
-            AuthHealthService.recordEndpointMetric("POST", "/v1/auth/logout-all", success, responseTime);
-        }
+        return ResponseEntity.ok(
+                GlobalApiResponse.<Map<String, Object>>builder()
+                        .success(true)
+                        .message("User logged out from all devices successfully")
+                        .data(null)
+                        .build()
+        );
     }
 
-    @GetMapping("/health")
-    public ResponseEntity<GlobalApiResponse<AuthHealthResponse>> authServiceHealthCheck(
+    @GetMapping("/profile")
+    public ResponseEntity<GlobalApiResponse<ProfileResponse>> getProfile(
+            Authentication authentication,
             HttpServletRequest request
     ) {
-        long startTime = System.currentTimeMillis();
-        boolean success = false;
+        PrincipalUser user = (PrincipalUser) authentication.getPrincipal();
+        String userId = user.getUserId().toString();
 
-        try {
-            log.info("Health check for auth service from IP: {}", getClientIP(request));
+        log.info("Profile fetch request from IP: {} for user: {}", getClientIP(request), userId);
 
-            AuthHealthResponse response = authHealthService.getDetailedHealthInfo();
-            success = true;
+        ProfileResponse response = authService.getUserProfile(userId);
 
-            return ResponseEntity.ok(
-                    GlobalApiResponse.<AuthHealthResponse>builder()
-                            .success(true)
-                            .message("Auth service health check successful")
-                            .data(response)
-                            .build()
-            );
-        } finally {
-            double responseTime = System.currentTimeMillis() - startTime;
-            AuthHealthService.recordEndpointMetric("GET", "/v1/auth/health", success, responseTime);
-        }
+        return ResponseEntity.ok(
+                GlobalApiResponse.<ProfileResponse>builder()
+                        .success(true)
+                        .message("Profile fetched successfully")
+                        .data(response)
+                        .build()
+        );
+    }
+
+    @PatchMapping("/profile/update")
+    public ResponseEntity<GlobalApiResponse<ProfileResponse>> updateProfile(
+            @Valid @RequestBody UpdateProfileRequest updateRequest,
+            Authentication authentication,
+            HttpServletRequest request
+    ) {
+        PrincipalUser user = (PrincipalUser) authentication.getPrincipal();
+        String userId = user.getUserId().toString();
+
+        log.info("Profile update request from IP: {} for user: {}", getClientIP(request), userId);
+
+        ProfileResponse response = authService.updateUserProfile(userId, updateRequest);
+
+        log.info("Profile updated successfully for user: {}", userId);
+
+        return ResponseEntity.ok(
+                GlobalApiResponse.<ProfileResponse>builder()
+                        .success(true)
+                        .message("Profile updated successfully")
+                        .data(response)
+                        .build()
+        );
     }
 }

@@ -27,9 +27,6 @@ public class UserMetadataDTO {
     private String role;
     private Boolean isEmailVerified;
     private Boolean isPhoneVerified;
-    private Integer failedLoginAttempts;
-    private String lastLoginTime;
     private String createdAt;
     private String updatedAt;
-    private Long version;
 }

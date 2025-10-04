@@ -13,6 +13,9 @@ package com.singhtwenty2.commerce_service.service.impls;
 
 import com.singhtwenty2.commerce_service.data.dto.auth.LoginDTO.LoginRequest;
 import com.singhtwenty2.commerce_service.data.dto.auth.LoginDTO.LoginResponse;
+import com.singhtwenty2.commerce_service.data.dto.auth.ProfileDTO.ActiveSessionDTO;
+import com.singhtwenty2.commerce_service.data.dto.auth.ProfileDTO.ProfileResponse;
+import com.singhtwenty2.commerce_service.data.dto.auth.ProfileDTO.UpdateProfileRequest;
 import com.singhtwenty2.commerce_service.data.dto.auth.RegisterDTO.RegisterRequest;
 import com.singhtwenty2.commerce_service.data.dto.auth.RegisterDTO.RegisterResponse;
 import com.singhtwenty2.commerce_service.data.dto.auth.common.UserMetadataDTO;
@@ -36,11 +39,13 @@ import org.springframework.web.context.request.ServletRequestAttributes;
 import org.springframework.web.server.ResponseStatusException;
 
 import java.time.LocalDateTime;
+import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 import java.util.regex.Pattern;
+import java.util.stream.Collectors;
 
-import static com.singhtwenty2.commerce_service.data.dto.auth.TokenDTO.RefreshTokenRequest;
+import static com.singhtwenty2.commerce_service.data.dto.auth.TokenDTO.RotateTokenRequest;
 
 @Service
 @Slf4j
@@ -70,12 +75,6 @@ public class AuthServiceImpl implements AuthService {
 
         log.info("User registered successfully with ID: {}", savedUser.getId());
 
-        // AS PER NEW REQUIREMENTS, LET THE USER LOGIN WITHOUT VERIFICATION
-//        return RegisterResponse.builder()
-//                .additionalNotes("Please verify your email and phone number. You can log in only after verification.")
-//                .userMetadata(buildUserMetadata(savedUser))
-//                .build();
-
         return RegisterResponse.builder()
                 .additionalNotes("You have been registered successfully. You can log in now.")
                 .userMetadata(buildUserMetadata(savedUser))
@@ -95,98 +94,98 @@ public class AuthServiceImpl implements AuthService {
         log.info("Admin registered successfully with ID: {}", savedUser.getId());
 
         return RegisterResponse.builder()
-                .additionalNotes("You have been registered as an admin. Please verify your email and phone number before logging in.")
+                .additionalNotes("You have been registered as an admin. You can log in now.")
                 .userMetadata(buildUserMetadata(savedUser))
                 .build();
     }
 
     @Override
-    public LoginResponse login(LoginRequest loginRequest) {
-        log.debug("Login attempt for: {}", loginRequest.getMobileNumber());
+    public LoginResponse loginUser(LoginRequest loginRequest) {
+        log.debug("User login attempt for: {}", loginRequest.getMobileNumber());
 
         validateLoginRequest(loginRequest);
-
         User user = authenticateUser(loginRequest);
 
-        if (!user.canLogin()) {
-            user.recordFailedLogin();
-            userRepository.save(user);
-
-            String reason = determineLoginFailureReason(user);
-            throw new ResponseStatusException(HttpStatus.FORBIDDEN, reason);
+        if (user.getRole() != UserRole.USER) {
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "This endpoint is only for regular users");
         }
 
-        cleanupUserSessions(user);
+        if (!user.getIsActive()) {
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Account is deactivated");
+        }
 
-        String accessToken = jwtService.generateAccessToken(user.getId().toString(), user.getRole().name());
-        RefreshToken refreshToken = createRefreshToken(user);
-
-        user.recordSuccessfulLogin();
-        userRepository.save(user);
-
-        log.info("User logged in successfully: {}", user.getId());
-
-        return LoginResponse.builder()
-                .additionalNotes("Please keep your tokens secure.")
-                .tokenType("Bearer")
-                .accessToken(accessToken)
-                .refreshToken(refreshToken.getToken())
-                .userMetadata(buildUserMetadata(user))
-                .build();
+        return performLogin(user);
     }
 
     @Override
-    public LoginResponse refreshToken(RefreshTokenRequest refreshTokenRequest) {
-        log.debug("Token refresh attempt");
+    public LoginResponse loginAdmin(LoginRequest loginRequest) {
+        log.debug("Admin login attempt for: {}", loginRequest.getMobileNumber());
 
-        if (!StringUtils.hasText(refreshTokenRequest.getRefreshTokenValue())) {
+        validateLoginRequest(loginRequest);
+        User user = authenticateUser(loginRequest);
+
+        if (user.getRole() != UserRole.ADMIN) {
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "This endpoint is only for administrators");
+        }
+
+        if (!user.getIsActive()) {
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Account is deactivated");
+        }
+
+        return performLogin(user);
+    }
+
+    @Override
+    public LoginResponse rotateTokens(RotateTokenRequest rotateTokenRequest) {
+        log.debug("Token rotation attempt");
+
+        if (!StringUtils.hasText(rotateTokenRequest.getRefreshTokenValue())) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Refresh token is required");
         }
 
-        Optional<RefreshToken> tokenOptional = refreshTokenRepository.findByToken(refreshTokenRequest.getRefreshTokenValue());
+        Optional<RefreshToken> tokenOptional = refreshTokenRepository.findByToken(rotateTokenRequest.getRefreshTokenValue());
 
         if (tokenOptional.isEmpty()) {
             throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "Invalid refresh token");
         }
 
-        RefreshToken refreshToken = tokenOptional.get();
+        RefreshToken oldRefreshToken = tokenOptional.get();
 
-        if (!refreshToken.isValid()) {
-            refreshToken.revoke();
-            refreshTokenRepository.save(refreshToken);
+        if (!oldRefreshToken.isValid()) {
+            oldRefreshToken.revoke();
+            refreshTokenRepository.save(oldRefreshToken);
             throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "Refresh token expired or revoked");
         }
 
-        User user = refreshToken.getUser();
+        User user = oldRefreshToken.getUser();
 
-        if (!user.canLogin()) {
-            refreshToken.revoke();
-            refreshTokenRepository.save(refreshToken);
-            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Account access denied");
+        if (!user.getIsActive()) {
+            oldRefreshToken.revoke();
+            refreshTokenRepository.save(oldRefreshToken);
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Account is deactivated");
         }
 
+        oldRefreshToken.revoke();
+        refreshTokenRepository.save(oldRefreshToken);
+
         String newAccessToken = jwtService.generateAccessToken(user.getId().toString(), user.getRole().name());
+        RefreshToken newRefreshToken = createRefreshToken(user);
 
-        refreshToken.setUpdatedAt(LocalDateTime.now());
-        refreshTokenRepository.save(refreshToken);
-
-        log.info("Token refreshed successfully for user: {}", user.getId());
+        log.info("Tokens rotated successfully for user: {}", user.getId());
 
         return LoginResponse.builder()
-                .additionalNotes("Your access token has been refreshed successfully.")
-                .accessToken(newAccessToken)
-                .refreshToken(refreshTokenRequest.getRefreshTokenValue())
                 .tokenType("Bearer")
-                .userMetadata(buildUserMetadata(user))
+                .accessToken(newAccessToken)
+                .refreshToken(newRefreshToken.getToken())
                 .build();
     }
 
     @Override
-    public void logout(RefreshTokenRequest refreshTokenRequest) {
+    public void logout(RotateTokenRequest rotateTokenRequest) {
         log.debug("Logout attempt");
 
-        if (StringUtils.hasText(refreshTokenRequest.getRefreshTokenValue())) {
-            Optional<RefreshToken> tokenOptional = refreshTokenRepository.findByToken(refreshTokenRequest.getRefreshTokenValue());
+        if (StringUtils.hasText(rotateTokenRequest.getRefreshTokenValue())) {
+            Optional<RefreshToken> tokenOptional = refreshTokenRepository.findByToken(rotateTokenRequest.getRefreshTokenValue());
             tokenOptional.ifPresent(token -> {
                 token.revoke();
                 refreshTokenRepository.save(token);
@@ -204,6 +203,103 @@ public class AuthServiceImpl implements AuthService {
             refreshTokenRepository.revokeAllTokensForUser(userOptional.get());
             log.info("All tokens revoked for user: {}", userId);
         }
+    }
+
+    @Override
+    public ProfileResponse getUserProfile(String userId) {
+        log.debug("Fetching profile for user: {}", userId);
+
+        User user = userRepository.findById(UUID.fromString(userId))
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "User not found"));
+
+        List<RefreshToken> activeSessions = refreshTokenRepository.findActiveTokensForUser(user, LocalDateTime.now());
+
+        List<ActiveSessionDTO> activeSessionDTOs = activeSessions.stream()
+                .map(this::buildActiveSessionDTO)
+                .collect(Collectors.toList());
+
+        return ProfileResponse.builder()
+                .userId(user.getId().toString())
+                .name(user.getName())
+                .phone(user.getMobileNumber())
+                .email(user.getEmail())
+                .role(user.getRole().name())
+                .isEmailVerified(user.getIsEmailVerified())
+                .isPhoneVerified(user.getIsMobileVerified())
+                .lastLoginTime(user.getLastLoginTime() != null ? user.getLastLoginTime().toString() : null)
+                .createdAt(user.getCreatedAt().toString())
+                .updatedAt(user.getUpdatedAt().toString())
+                .activeSessions(activeSessionDTOs)
+                .totalActiveSessions(activeSessionDTOs.size())
+                .build();
+    }
+
+    @Override
+    public ProfileResponse updateUserProfile(String userId, UpdateProfileRequest updateRequest) {
+        log.debug("Updating profile for user: {}", userId);
+
+        User user = userRepository.findById(UUID.fromString(userId))
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "User not found"));
+
+        boolean updated = false;
+
+        if (StringUtils.hasText(updateRequest.getName()) && !updateRequest.getName().equals(user.getName())) {
+            if (updateRequest.getName().trim().length() < 2) {
+                throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Name must be at least 2 characters long");
+            }
+            user.setName(updateRequest.getName().trim());
+            updated = true;
+        }
+
+        if (StringUtils.hasText(updateRequest.getPhone()) && !updateRequest.getPhone().equals(user.getMobileNumber())) {
+            if (!PHONE_PATTERN.matcher(updateRequest.getPhone()).matches()) {
+                throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Invalid phone number format");
+            }
+            if (userRepository.findByMobileNumber(updateRequest.getPhone()).isPresent()) {
+                throw new ResponseStatusException(HttpStatus.CONFLICT, "Phone number already in use");
+            }
+            user.setMobileNumber(updateRequest.getPhone());
+            user.setIsMobileVerified(false);
+            updated = true;
+        }
+
+        if (StringUtils.hasText(updateRequest.getEmail()) && !updateRequest.getEmail().equals(user.getEmail())) {
+            if (!EMAIL_PATTERN.matcher(updateRequest.getEmail()).matches()) {
+                throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Invalid email format");
+            }
+            if (userRepository.findByEmail(updateRequest.getEmail()).isPresent()) {
+                throw new ResponseStatusException(HttpStatus.CONFLICT, "Email already in use");
+            }
+            user.setEmail(updateRequest.getEmail().toLowerCase());
+            user.setIsEmailVerified(false);
+            updated = true;
+        }
+
+        if (updated) {
+            user.setUpdatedAt(LocalDateTime.now());
+            userRepository.save(user);
+            log.info("Profile updated successfully for user: {}", userId);
+        }
+
+        return getUserProfile(userId);
+    }
+
+    private LoginResponse performLogin(User user) {
+        cleanupUserSessions(user);
+
+        String accessToken = jwtService.generateAccessToken(user.getId().toString(), user.getRole().name());
+        RefreshToken refreshToken = createRefreshToken(user);
+
+        user.recordSuccessfulLogin();
+        userRepository.save(user);
+
+        log.info("User logged in successfully: {}", user.getId());
+
+        return LoginResponse.builder()
+                .tokenType("Bearer")
+                .accessToken(accessToken)
+                .refreshToken(refreshToken.getToken())
+                .build();
     }
 
     private void validateRegistrationRequest(RegisterRequest request) {
@@ -279,20 +375,10 @@ public class AuthServiceImpl implements AuthService {
             throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "Invalid credentials");
         }
 
-        return user;
-    }
+        user.setFailedLoginAttempts(0);
+        userRepository.save(user);
 
-    private String determineLoginFailureReason(User user) {
-        if (!user.getIsActive()) {
-            return "Account is deactivated";
-        }
-        if (user.getIsAccountLocked()) {
-            return "Account is locked due to too many failed login attempts";
-        }
-        if (!user.getIsEmailVerified() && !user.getIsMobileVerified()) {
-            return "Please verify your email or phone number before logging in";
-        }
-        return "Account access denied";
+        return user;
     }
 
     private void cleanupUserSessions(User user) {
@@ -369,12 +455,20 @@ public class AuthServiceImpl implements AuthService {
                 .role(user.getRole().name())
                 .isEmailVerified(user.getIsEmailVerified())
                 .isPhoneVerified(user.getIsMobileVerified())
-                .failedLoginAttempts(user.getFailedLoginAttempts())
-                .lastLoginTime(user.getLastLoginTime() != null ? user.getLastLoginTime().toString() : null)
                 .createdAt(user.getCreatedAt().toString())
                 .updatedAt(user.getUpdatedAt().toString())
-                .version(user.getVersion())
                 .build();
     }
 
+    private ActiveSessionDTO buildActiveSessionDTO(RefreshToken token) {
+        return ActiveSessionDTO.builder()
+                .sessionId(token.getId().toString())
+                .deviceInfo(token.getDeviceInfo())
+                .ipAddress(token.getIpAddress())
+                .userAgent(token.getUserAgent())
+                .createdAt(token.getCreatedAt().toString())
+                .expiresAt(token.getExpiresAt().toString())
+                .lastUsedAt(token.getUpdatedAt().toString())
+                .build();
+    }
 }

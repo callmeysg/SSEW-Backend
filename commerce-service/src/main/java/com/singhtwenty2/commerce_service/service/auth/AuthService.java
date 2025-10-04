@@ -11,38 +11,31 @@
  */
 package com.singhtwenty2.commerce_service.service.auth;
 
+import com.singhtwenty2.commerce_service.data.dto.auth.LoginDTO.LoginRequest;
 import com.singhtwenty2.commerce_service.data.dto.auth.LoginDTO.LoginResponse;
+import com.singhtwenty2.commerce_service.data.dto.auth.ProfileDTO.ProfileResponse;
+import com.singhtwenty2.commerce_service.data.dto.auth.ProfileDTO.UpdateProfileRequest;
 import com.singhtwenty2.commerce_service.data.dto.auth.RegisterDTO.RegisterRequest;
 import com.singhtwenty2.commerce_service.data.dto.auth.RegisterDTO.RegisterResponse;
-import org.springframework.stereotype.Service;
+import com.singhtwenty2.commerce_service.data.dto.auth.TokenDTO.RotateTokenRequest;
 
-import static com.singhtwenty2.commerce_service.data.dto.auth.LoginDTO.LoginRequest;
-import static com.singhtwenty2.commerce_service.data.dto.auth.TokenDTO.RefreshTokenRequest;
-
-@Service
 public interface AuthService {
 
-    public RegisterResponse registerUser(
-            RegisterRequest registerRequest
-    );
+    RegisterResponse registerUser(RegisterRequest registerRequest);
 
-    public RegisterResponse registerAdmin(
-            RegisterRequest registerRequest
-    );
+    RegisterResponse registerAdmin(RegisterRequest registerRequest);
 
-    public LoginResponse login(
-            LoginRequest loginRequest
-    );
+    LoginResponse loginUser(LoginRequest loginRequest);
 
-    public LoginResponse refreshToken(
-            RefreshTokenRequest refreshTokenRequest
-    );
+    LoginResponse loginAdmin(LoginRequest loginRequest);
 
-    public void logout(
-            RefreshTokenRequest refreshTokenRequest
-    );
+    LoginResponse rotateTokens(RotateTokenRequest rotateTokenRequest);
 
-    public void logoutAllDevices(
-            String userId
-    );
+    void logout(RotateTokenRequest rotateTokenRequest);
+
+    void logoutAllDevices(String userId);
+
+    ProfileResponse getUserProfile(String userId);
+
+    ProfileResponse updateUserProfile(String userId, UpdateProfileRequest updateRequest);
 }

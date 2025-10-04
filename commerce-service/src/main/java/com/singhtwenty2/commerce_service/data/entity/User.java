@@ -122,19 +122,9 @@ public class User extends BaseEntity implements UserDetails {
 
     public void recordFailedLogin() {
         this.failedLoginAttempts++;
-        if (this.failedLoginAttempts >= 15) {
-            this.isAccountLocked = true;
-        }
     }
 
     public boolean isFullyVerified() {
         return isEmailVerified && isMobileVerified;
-    }
-
-    public boolean canLogin() {
-        // Uncomment the below line if you want to enforce email or mobile verification for login
-        // As per CLIENT'S requirement, commenting it out
-        // return isActive && !isAccountLocked && (isEmailVerified || isMobileVerified);
-        return isActive && !isAccountLocked;
     }
 }
