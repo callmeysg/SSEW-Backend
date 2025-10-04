@@ -13,8 +13,8 @@
 spring:
   application:
     name: commerce-service
-  profiles:
-    include: secrets
+#  profiles:
+#    include: secrets
   datasource:
     driver-class-name: org.postgresql.Driver
   jpa:
