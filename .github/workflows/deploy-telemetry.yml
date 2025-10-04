@@ -66,11 +66,15 @@ jobs:
           script: |
             set -e
             cd /home/ubuntu/ssew-deployment
-            
+
             curl -o docker-compose.yml https://raw.githubusercontent.com/${{ github.repository }}/main/docker-compose.yml
+
+            if [ -f .env ]; then
+              export $(grep -v '^#' .env | xargs)
+            fi
             
             cat > .env << EOF
-            COMMERCE_IMAGE_TAG=${{ secrets.COMMERCE_IMAGE_TAG || 'staging-latest' }}
+            COMMERCE_IMAGE_TAG=${COMMERCE_IMAGE_TAG:-staging-latest}
             TELEMETRY_IMAGE_TAG=staging-${{ steps.build-number.outputs.BUILD_NUMBER }}
             JWT_SECRET=${{ secrets.JWT_SECRET }}
             REDIS_PASSWORD=redis_staging_pass
@@ -113,8 +117,8 @@ jobs:
             echo " recreating telemetry-service container..."
             docker-compose up -d --force-recreate --no-deps telemetry-service
 
-            echo " removing old/unused docker images..."
-            docker image prune -af
+            echo " removing old/unused docker images (older than 1 hour)..."
+            docker image prune -af --filter "until=1h"
 
             echo "✅ Deployment complete. Current status:"
             docker-compose ps
