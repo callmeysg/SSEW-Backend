@@ -1,0 +1,226 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>New Order Notification</title>
+</head>
+<body style="margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif; background-color: #f7f7f7; -webkit-font-smoothing: antialiased;">
+<table role="presentation" style="width: 100%; border-collapse: collapse; background-color: #f7f7f7;">
+    <tr>
+        <td align="center" style="padding: 20px 10px;">
+            <table role="presentation"
+                   style="width: 100%; max-width: 600px; border-collapse: collapse; background-color: #ffffff; border-radius: 8px; overflow: hidden; box-shadow: 0 1px 3px rgba(0,0,0,0.12);">
+
+                <tr>
+                    <td style="background-color: #1a1a1a; padding: 24px 30px; border-bottom: 3px solid #4CAF50;">
+                        <table style="width: 100%; border-collapse: collapse;">
+                            <tr>
+                                <td style="vertical-align: middle;">
+                                    <h1 style="margin: 0; color: #ffffff; font-size: 22px; font-weight: 600; letter-spacing: -0.3px;"
+                                        th:text="${companyName}">Sri Shasta Engineering Works</h1>
+                                    <p style="margin: 4px 0 0 0; color: #9ca3af; font-size: 13px;"
+                                       th:text="${companyTagline}">Engineering Excellence in Every Product</p>
+                                </td>
+                                <td style="text-align: right; vertical-align: middle;">
+                                    <span style="background-color: #4CAF50; color: #ffffff; padding: 6px 12px; border-radius: 20px; font-size: 12px; font-weight: 600;">NEW ORDER</span>
+                                </td>
+                            </tr>
+                        </table>
+                    </td>
+                </tr>
+
+                <tr>
+                    <td style="padding: 32px 30px 8px 30px;">
+                        <h2 style="margin: 0 0 4px 0; color: #1a1a1a; font-size: 20px; font-weight: 600;">New Order
+                            Received</h2>
+                        <p style="margin: 0 0 24px 0; color: #6b7280; font-size: 14px;">A new order has been placed on
+                            <span th:text="${orderPlacedAt}">04 Oct 2025, 2:30 PM</span></p>
+
+                        <table style="width: 100%; border-collapse: collapse; background-color: #f9fafb; border-radius: 6px; overflow: hidden;">
+                            <tr>
+                                <td style="padding: 20px;">
+                                    <table style="width: 100%; border-collapse: collapse;">
+                                        <tr>
+                                            <td style="width: 50%;">
+                                                <p style="margin: 0 0 4px 0; color: #6b7280; font-size: 12px; text-transform: uppercase; letter-spacing: 0.5px;">
+                                                    Order ID</p>
+                                                <p style="margin: 0; color: #1a1a1a; font-size: 16px; font-weight: 600;"
+                                                   th:text="${#strings.substring(orderId, 0, 8)}">ORD12345</p>
+                                            </td>
+                                            <td style="width: 50%; text-align: right;">
+                                                <p style="margin: 0 0 4px 0; color: #6b7280; font-size: 12px; text-transform: uppercase; letter-spacing: 0.5px;">
+                                                    Total Amount</p>
+                                                <p style="margin: 0; color: #1a1a1a; font-size: 24px; font-weight: 700;">
+                                                    ₹<span
+                                                        th:text="${#strings.replace(totalAmount, '₹', '')}">45,999</span>
+                                                </p>
+                                            </td>
+                                        </tr>
+                                    </table>
+                                </td>
+                            </tr>
+                        </table>
+                    </td>
+                </tr>
+
+                <tr>
+                    <td style="padding: 0 30px 24px 30px;">
+                        <table style="width: 100%; border-collapse: collapse;">
+                            <tr>
+                                <td style="padding: 24px 0 16px 0;">
+                                    <h3 style="margin: 0; color: #1a1a1a; font-size: 14px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px;">
+                                        Customer Details</h3>
+                                </td>
+                            </tr>
+                            <tr>
+                                <td>
+                                    <table style="width: 100%; border-collapse: collapse; border: 1px solid #e5e7eb; border-radius: 6px; overflow: hidden;">
+                                        <tr>
+                                            <td style="padding: 12px 16px; background-color: #fafafa; border-bottom: 1px solid #e5e7eb;">
+                                                <table style="width: 100%; border-collapse: collapse;">
+                                                    <tr>
+                                                        <td style="width: 30px; vertical-align: top;">
+                                                            <div style="width: 24px; height: 24px; background-color: #4CAF50; border-radius: 50%; text-align: center; line-height: 24px; color: white; font-size: 12px; font-weight: 600;"
+                                                                 th:text="${#strings.substring(customerName, 0, 1)}">J
+                                                            </div>
+                                                        </td>
+                                                        <td style="padding-left: 12px;">
+                                                            <p style="margin: 0; color: #1a1a1a; font-size: 15px; font-weight: 600;"
+                                                               th:text="${customerName}">John Doe</p>
+                                                            <p style="margin: 2px 0 0 0; color: #6b7280; font-size: 13px;"
+                                                               th:text="${phoneNumber}">+91 98765 43210</p>
+                                                        </td>
+                                                    </tr>
+                                                </table>
+                                            </td>
+                                        </tr>
+                                        <tr>
+                                            <td style="padding: 12px 16px; background-color: #ffffff;">
+                                                <p style="margin: 0 0 2px 0; color: #6b7280; font-size: 11px; text-transform: uppercase; letter-spacing: 0.5px;">
+                                                    Delivery Address</p>
+                                                <p style="margin: 0; color: #1a1a1a; font-size: 14px; line-height: 1.5;"
+                                                   th:text="${fullAddress}">123 Main St, Mumbai, MH 400001</p>
+                                            </td>
+                                        </tr>
+                                    </table>
+                                </td>
+                            </tr>
+                        </table>
+                    </td>
+                </tr>
+
+                <tr>
+                    <td style="padding: 0 30px 32px 30px;">
+                        <table style="width: 100%; border-collapse: collapse;">
+                            <tr>
+                                <td style="padding: 0 0 16px 0;">
+                                    <h3 style="margin: 0; color: #1a1a1a; font-size: 14px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px;">
+                                        Order Items (<span th:text="${totalItems}">3</span>)</h3>
+                                </td>
+                            </tr>
+                            <tr>
+                                <td>
+                                    <table style="width: 100%; border-collapse: collapse; border: 1px solid #e5e7eb; border-radius: 6px; overflow: hidden;">
+                                        <thead>
+                                        <tr style="background-color: #fafafa;">
+                                            <th style="padding: 12px 16px; text-align: left; color: #6b7280; font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px; border-bottom: 1px solid #e5e7eb;">
+                                                Product
+                                            </th>
+                                            <th style="padding: 12px 16px; text-align: center; color: #6b7280; font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px; border-bottom: 1px solid #e5e7eb; width: 60px;">
+                                                Qty
+                                            </th>
+                                            <th style="padding: 12px 16px; text-align: right; color: #6b7280; font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px; border-bottom: 1px solid #e5e7eb; width: 100px;">
+                                                Amount
+                                            </th>
+                                        </tr>
+                                        </thead>
+                                        <tbody>
+                                        <tr th:each="item, iterStat : ${orderItems}"
+                                            th:style="${!iterStat.last ? 'border-bottom: 1px solid #f3f4f6;' : ''}">
+                                            <td style="padding: 14px 16px; background-color: #ffffff;">
+                                                <p style="margin: 0; color: #1a1a1a; font-size: 14px; font-weight: 500;"
+                                                   th:text="${item.productName}">Product Name</p>
+                                                <p style="margin: 2px 0 0 0; color: #9ca3af; font-size: 12px;"
+                                                   th:text="${'SKU: ' + item.productSku}">SKU: 12345</p>
+                                            </td>
+                                            <td style="padding: 14px 16px; text-align: center; color: #1a1a1a; font-size: 14px; font-weight: 500; background-color: #ffffff;"
+                                                th:text="${item.quantity}">2
+                                            </td>
+                                            <td style="padding: 14px 16px; text-align: right; color: #1a1a1a; font-size: 14px; font-weight: 600; background-color: #ffffff;">
+                                                ₹<span
+                                                    th:text="${#numbers.formatDecimal(item.totalPrice, 1, 'COMMA', 2, 'POINT')}">22,999.00</span>
+                                            </td>
+                                        </tr>
+                                        </tbody>
+                                        <tfoot>
+                                        <tr style="background-color: #fafafa;">
+                                            <td colspan="2"
+                                                style="padding: 14px 16px; border-top: 1px solid #e5e7eb; text-align: right; color: #1a1a1a; font-size: 14px; font-weight: 600;">
+                                                Subtotal
+                                            </td>
+                                            <td style="padding: 14px 16px; border-top: 1px solid #e5e7eb; text-align: right; color: #1a1a1a; font-size: 14px; font-weight: 600;">
+                                                ₹<span th:text="${#strings.replace(totalAmount, '₹', '')}">45,999</span>
+                                            </td>
+                                        </tr>
+                                        <tr style="background-color: #1a1a1a;">
+                                            <td colspan="2"
+                                                style="padding: 14px 16px; text-align: right; color: #ffffff; font-size: 15px; font-weight: 600;">
+                                                Total Amount
+                                            </td>
+                                            <td style="padding: 14px 16px; text-align: right; color: #4CAF50; font-size: 18px; font-weight: 700;">
+                                                ₹<span th:text="${#strings.replace(totalAmount, '₹', '')}">45,999</span>
+                                            </td>
+                                        </tr>
+                                        </tfoot>
+                                    </table>
+                                </td>
+                            </tr>
+                        </table>
+                    </td>
+                </tr>
+
+                <tr>
+                    <td style="padding: 0 30px 32px 30px;">
+                        <table style="width: 100%; border-collapse: collapse;">
+                            <tr>
+                                <td align="center">
+                                    <a th:href="${'https://dash.srishastabangalore.in/dashboard/orders/' + orderId}"
+                                       href="https://dash.srishastabangalore.in/dashboard/orders/ORDER_ID"
+                                       style="display: inline-block; background-color: #4CAF50; color: #ffffff; padding: 14px 32px; border-radius: 6px; text-decoration: none; font-size: 15px; font-weight: 600; letter-spacing: 0.3px;">
+                                        View Order Details in Dashboard
+                                    </a>
+                                    <p style="margin: 12px 0 0 0; color: #6b7280; font-size: 12px;">
+                                        Process this order promptly to ensure timely delivery
+                                    </p>
+                                </td>
+                            </tr>
+                        </table>
+                    </td>
+                </tr>
+
+                <tr>
+                    <td style="background-color: #fafafa; padding: 24px 30px; border-top: 1px solid #e5e7eb;">
+                        <table style="width: 100%; border-collapse: collapse;">
+                            <tr>
+                                <td>
+                                    <p style="margin: 0 0 8px 0; color: #6b7280; font-size: 12px; line-height: 1.6; text-align: center;">
+                                        This is an automated notification for admin users. Please process this order
+                                        through the admin dashboard.
+                                    </p>
+                                    <p style="margin: 0; color: #9ca3af; font-size: 11px; text-align: center;">
+                                        © 2025 <span th:text="${companyName}">Sri Shasta Engineering Works</span>.
+                                        Internal Communication.
+                                    </p>
+                                </td>
+                            </tr>
+                        </table>
+                    </td>
+                </tr>
+
+            </table>
+        </td>
+    </tr>
+</table>
+</body>
+</html>

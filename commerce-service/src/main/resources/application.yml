@@ -1,15 +1,3 @@
-#
-# Copyright 2025 Aryan Singh
-# Developer: Aryan Singh (@singhtwenty2)
-# Portfolio: https://singhtwenty2.pages.dev/
-# This file is part of SSEW E-commerce Backend System
-# Licensed under MIT License
-# For commercial use and inquiries: aryansingh.corp@gmail.com
-# @author Aryan Singh (@singhtwenty2)
-# @project SSEW E-commerce Backend System
-# @since 2025
-#
-
 spring:
   application:
     name: commerce-service
@@ -26,11 +14,32 @@ spring:
       hibernate:
         format_sql: true
 
+  mail:
+    host: smtp.gmail.com
+    port: 587
+    properties:
+      mail:
+        smtp:
+          auth: true
+          starttls:
+            enable: true
+            required: true
+          connectiontimeout: 5000
+          timeout: 5000
+          writetimeout: 5000
+
   data:
     redis:
       ssl:
         enabled: false
       timeout: 2000ms
+
+  thymeleaf:
+    cache: false
+    prefix: classpath:/templates/
+    suffix: .html
+    mode: HTML
+    encoding: UTF-8
 
   main:
     banner-mode: off
@@ -52,6 +61,7 @@ server:
 logging:
   level:
     com.singhtwenty2: DEBUG
+    io.sentry: OFF
 
 app:
   watermark:
@@ -69,7 +79,7 @@ sentry:
   environment: development
   release: ssew-core@0.0.1-SNAPSHOT
   enable-tracing: true
-  debug: true
+  debug: false
   tags:
     service: ssew-core
     version: 0.0.1-SNAPSHOT

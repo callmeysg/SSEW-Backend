@@ -1,17 +1,7 @@
-/**
- * Copyright 2025 Aryan Singh
- * Developer: Aryan Singh (@singhtwenty2)
- * Portfolio: https://singhtwenty2.pages.dev/
- * This file is part of SSEW E-commerce Backend System
- * Licensed under MIT License
- * For commercial use and inquiries: aryansingh.corp@gmail.com
- * @author Aryan Singh (@singhtwenty2)
- * @project SSEW E-commerce Backend System
- * @since 2025
- */
 package com.singhtwenty2.commerce_service.service.impls;
 
 import com.singhtwenty2.commerce_service.data.dto.catalogue.PreSignedUrlDTO.PresignedUrlResponse;
+import com.singhtwenty2.commerce_service.data.dto.notification.EmailEvent;
 import com.singhtwenty2.commerce_service.data.entity.*;
 import com.singhtwenty2.commerce_service.data.enums.CartType;
 import com.singhtwenty2.commerce_service.data.enums.OrderStatus;
@@ -20,6 +10,8 @@ import com.singhtwenty2.commerce_service.data.repository.OrderRepository;
 import com.singhtwenty2.commerce_service.data.repository.UserRepository;
 import com.singhtwenty2.commerce_service.service.file_handeling.S3Service;
 import com.singhtwenty2.commerce_service.service.grpc.TelemetryClientService;
+import com.singhtwenty2.commerce_service.service.notification.EmailService;
+import com.singhtwenty2.commerce_service.service.notification.RedisQueueService;
 import com.singhtwenty2.commerce_service.service.order_mangement.OrderService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -35,9 +27,11 @@ import org.springframework.web.server.ResponseStatusException;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
+import java.time.format.DateTimeFormatter;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.UUID;
+import java.util.stream.Collectors;
 
 import static com.singhtwenty2.commerce_service.data.dto.order_mangement.OrderDTO.*;
 
@@ -52,6 +46,10 @@ public class OrderServiceImpl implements OrderService {
     private final UserRepository userRepository;
     private final S3Service s3Service;
     private final TelemetryClientService telemetryClientService;
+    private final RedisQueueService redisQueueService;
+    private final EmailService emailService;
+
+    private static final DateTimeFormatter DATE_FORMATTER = DateTimeFormatter.ofPattern("dd MMM yyyy, hh:mm a");
 
     @Override
     public OrderResponse createOrder(CreateOrderRequest createRequest, String userId) {
@@ -69,6 +67,8 @@ public class OrderServiceImpl implements OrderService {
                 savedOrder.getCustomerName(),
                 savedOrder.getTotalAmount().toString()
         );
+
+        publishNewOrderEmailEvent(savedOrder);
 
         log.info("Order created successfully with ID: {}", savedOrder.getId());
         return buildOrderResponse(savedOrder);
@@ -511,6 +511,46 @@ public class OrderServiceImpl implements OrderService {
             return UUID.fromString(id);
         } catch (IllegalArgumentException e) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, errorMessage);
+        }
+    }
+
+    private void publishNewOrderEmailEvent(Order order) {
+        try {
+            LocalDateTime orderTime = order.getCreatedAt() != null ?
+                    order.getCreatedAt() : LocalDateTime.now();
+
+            EmailEvent.EmailMetadata metadata = EmailEvent.EmailMetadata.builder()
+                    .orderId(order.getId().toString())
+                    .customerName(order.getCustomerName())
+                    .phoneNumber(order.getPhoneNumber())
+                    .fullAddress(order.getFullAddress())
+                    .totalAmount(order.getTotalAmount())
+                    .totalItems(order.getTotalItems())
+                    .orderPlacedAt(orderTime.format(DATE_FORMATTER))
+                    .orderItems(order.getOrderItems().stream()
+                            .map(item -> EmailEvent.OrderItemData.builder()
+                                    .productName(item.getProductName())
+                                    .productSku(item.getProductSku())
+                                    .quantity(item.getQuantity())
+                                    .unitPrice(item.getUnitPrice())
+                                    .totalPrice(item.getTotalPrice())
+                                    .build())
+                            .collect(Collectors.toList()))
+                    .build();
+
+            EmailEvent emailEvent = EmailEvent.builder()
+                    .eventId(UUID.randomUUID().toString())
+                    .eventType("NEW_ORDER")
+                    .recipientEmail(emailService.getAdminEmail())
+                    .createdAt(LocalDateTime.now())
+                    .retryCount(0)
+                    .metadata(metadata)
+                    .build();
+
+            redisQueueService.publishEmailEvent(emailEvent);
+            log.info("Published email event for new order: {}", order.getId());
+        } catch (Exception e) {
+            log.error("Failed to publish email event for order {}: {}", order.getId(), e.getMessage(), e);
         }
     }
 }
