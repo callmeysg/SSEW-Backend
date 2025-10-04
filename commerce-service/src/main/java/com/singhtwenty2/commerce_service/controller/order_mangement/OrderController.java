@@ -166,9 +166,8 @@ public class OrderController {
     @GetMapping("/admin/all")
     @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<GlobalApiResponse<PageResponse<OrderSummaryResponse>>> getAllOrdersForAdmin(
-            @RequestParam(required = false) String phoneNumber,
+            @RequestParam(required = false) String customerName,
             @RequestParam(required = false) OrderStatus status,
-            @RequestParam(required = false) String search,
             @RequestParam(defaultValue = "0") int index,
             @RequestParam(defaultValue = "10") int limit,
             @RequestParam(defaultValue = "createdAt") String sortBy,
@@ -177,12 +176,16 @@ public class OrderController {
     ) {
         log.debug("Fetching all orders for admin from IP: {}", getClientIP(request));
 
-        Sort sort = sortDir.equalsIgnoreCase("desc") ?
-                Sort.by(sortBy).descending() : Sort.by(sortBy).ascending();
-        Pageable pageable = PageRequest.of(index, limit, sort);
+        OrderFilterRequest filterRequest = OrderFilterRequest.builder()
+                .customerName(customerName)
+                .status(status)
+                .index(index)
+                .limit(limit)
+                .sortBy(sortBy)
+                .sortDir(sortDir)
+                .build();
 
-        Page<OrderSummaryResponse> orderPage = orderService.getAllOrdersForAdmin(
-                phoneNumber, status, search, pageable);
+        Page<OrderSummaryResponse> orderPage = orderService.getAllOrdersForAdmin(filterRequest);
         PageResponse<OrderSummaryResponse> response = PageResponse.from(orderPage);
 
         return ResponseEntity.ok(

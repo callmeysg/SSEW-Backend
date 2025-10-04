@@ -24,7 +24,9 @@ import com.singhtwenty2.commerce_service.service.order_mangement.OrderService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Sort;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -102,28 +104,34 @@ public class OrderServiceImpl implements OrderService {
 
     @Override
     @Transactional(readOnly = true)
-    public Page<OrderSummaryResponse> getAllOrdersForAdmin(String phoneNumber, OrderStatus status,
-                                                           String search, Pageable pageable) {
-        log.debug("Fetching orders for admin with filters");
+    public Page<OrderSummaryResponse> getAllOrdersForAdmin(OrderFilterRequest filterRequest) {
+        log.debug("Fetching orders for admin with filters: {}", filterRequest);
+
+        Sort sort = filterRequest.getSortDir().equalsIgnoreCase("desc") ?
+                Sort.by(filterRequest.getSortBy()).descending() :
+                Sort.by(filterRequest.getSortBy()).ascending();
+
+        Pageable pageable = PageRequest.of(
+                filterRequest.getIndex(),
+                filterRequest.getLimit(),
+                sort
+        );
+
         Page<Order> orderPage;
-        if (StringUtils.hasText(search)) {
-            orderPage = orderRepository.findOrdersWithFiltersAndSearch(
-                    StringUtils.hasText(phoneNumber) ? phoneNumber.trim() : null,
-                    status,
-                    search.trim(),
+
+        if (filterRequest.hasFilters()) {
+            log.debug("Applying filters - customerName: {}, status: {}",
+                    filterRequest.getCustomerName(), filterRequest.getStatus());
+            orderPage = orderRepository.findOrdersWithFilters(
+                    filterRequest.getCustomerName(),
+                    filterRequest.getStatus(),
                     pageable
             );
         } else {
-            if (StringUtils.hasText(phoneNumber) || status != null) {
-                orderPage = orderRepository.findOrdersWithFilters(
-                        StringUtils.hasText(phoneNumber) ? phoneNumber.trim() : null,
-                        status,
-                        pageable
-                );
-            } else {
-                orderPage = orderRepository.findAllByOrderByCreatedAtDesc(pageable);
-            }
+            log.debug("No filters applied, fetching all orders");
+            orderPage = orderRepository.findAll(pageable);
         }
+
         return orderPage.map(this::buildOrderSummaryResponse);
     }
 

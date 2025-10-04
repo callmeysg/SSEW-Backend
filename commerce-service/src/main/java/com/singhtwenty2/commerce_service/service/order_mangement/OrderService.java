@@ -11,12 +11,13 @@
  */
 package com.singhtwenty2.commerce_service.service.order_mangement;
 
-import com.singhtwenty2.commerce_service.data.dto.order_mangement.OrderDTO.*;
 import com.singhtwenty2.commerce_service.data.enums.OrderStatus;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 
 import java.util.Map;
+
+import static com.singhtwenty2.commerce_service.data.dto.order_mangement.OrderDTO.*;
 
 public interface OrderService {
 
@@ -28,8 +29,7 @@ public interface OrderService {
 
     Page<OrderSummaryResponse> getUserOrders(String userId, OrderStatus status, Pageable pageable);
 
-    Page<OrderSummaryResponse> getAllOrdersForAdmin(String phoneNumber, OrderStatus status,
-                                                    String search, Pageable pageable);
+    Page<OrderSummaryResponse> getAllOrdersForAdmin(OrderFilterRequest filterRequest);
 
     OrderResponse updateOrderStatus(String orderId, UpdateOrderStatusRequest updateRequest, boolean isAdmin);
 

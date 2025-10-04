@@ -198,4 +198,40 @@ public class OrderDTO {
         private Long deliveredOrders;
         private Long cancelledOrders;
     }
+
+    @Setter
+    @Getter
+    @Data
+    @Builder
+    @AllArgsConstructor
+    @NoArgsConstructor
+    public static class OrderFilterRequest {
+
+        private String customerName;
+        private OrderStatus status;
+
+        @Builder.Default
+        private Integer index = 0;
+
+        @Builder.Default
+        private Integer limit = 10;
+
+        @Builder.Default
+        private String sortBy = "createdAt";
+
+        @Builder.Default
+        private String sortDir = "desc";
+
+        public boolean hasFilters() {
+            return customerName != null || status != null;
+        }
+
+        public boolean hasCustomerNameFilter() {
+            return customerName != null && !customerName.trim().isEmpty();
+        }
+
+        public boolean hasStatusFilter() {
+            return status != null;
+        }
+    }
 }

@@ -34,42 +34,21 @@ public interface OrderRepository extends JpaRepository<Order, UUID> {
 
     Page<Order> findByUserIdAndStatusOrderByCreatedAtDesc(UUID userId, OrderStatus status, Pageable pageable);
 
-    Page<Order> findByStatusOrderByCreatedAtDesc(OrderStatus status, Pageable pageable);
-
-    Page<Order> findAllByOrderByCreatedAtDesc(Pageable pageable);
-
     @Query("SELECT o FROM Order o WHERE " +
            "(:customerName IS NULL OR UPPER(o.customerName) LIKE UPPER(CONCAT('%', :customerName, '%'))) AND " +
-           "(:phoneNumber IS NULL OR o.phoneNumber LIKE CONCAT('%', :phoneNumber, '%')) AND " +
-           "(:status IS NULL OR o.status = :status) AND " +
-           "(:city IS NULL OR UPPER(o.city) LIKE UPPER(CONCAT('%', :city, '%'))) " +
-           "ORDER BY o.createdAt DESC")
+           "(:status IS NULL OR o.status = :status)")
     Page<Order> findOrdersWithFilters(
-            @Param("phoneNumber") String phoneNumber,
+            @Param("customerName") String customerName,
             @Param("status") OrderStatus status,
             Pageable pageable
     );
 
     @Query("SELECT o FROM Order o WHERE " +
            "o.user.id = :userId AND " +
-           "(:status IS NULL OR o.status = :status) " +
-           "ORDER BY o.createdAt DESC")
+           "(:status IS NULL OR o.status = :status)")
     Page<Order> findUserOrdersWithFilters(
             @Param("userId") UUID userId,
             @Param("status") OrderStatus status,
-            Pageable pageable
-    );
-
-    @Query("SELECT o FROM Order o WHERE " +
-           "(:phoneNumber IS NULL OR o.phoneNumber LIKE CONCAT('%', :phoneNumber, '%')) AND " +
-           "(:status IS NULL OR o.status = :status) AND " +
-           "(:searchTerm IS NULL OR " +
-           "o.phoneNumber LIKE CONCAT('%', :searchTerm, '%')) " +
-           "ORDER BY o.createdAt DESC")
-    Page<Order> findOrdersWithFiltersAndSearch(
-            @Param("phoneNumber") String phoneNumber,
-            @Param("status") OrderStatus status,
-            @Param("searchTerm") String searchTerm,
             Pageable pageable
     );
 
