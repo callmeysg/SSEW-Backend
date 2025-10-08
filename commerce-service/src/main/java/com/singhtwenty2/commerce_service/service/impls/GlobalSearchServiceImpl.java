@@ -36,8 +36,8 @@ import org.springframework.web.server.ResponseStatusException;
 import java.time.Duration;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
-import java.util.concurrent.CompletableFuture;
 import java.util.stream.Collectors;
 
 @Service
@@ -93,23 +93,9 @@ public class GlobalSearchServiceImpl implements GlobalSearchService {
             return cachedResponse;
         }
 
-        CompletableFuture<List<ProductSearchResult>> productsFuture = CompletableFuture.supplyAsync(() ->
-                searchProductsInternal(trimmedSearchTerm, finalProductLimit)
-        );
-
-        CompletableFuture<List<ManufacturerSearchResult>> manufacturersFuture = CompletableFuture.supplyAsync(() ->
-                searchManufacturersInternal(trimmedSearchTerm, finalManufacturerLimit)
-        );
-
-        CompletableFuture<List<CategorySearchResult>> categoriesFuture = CompletableFuture.supplyAsync(() ->
-                searchCategoriesInternal(trimmedSearchTerm, finalCategoryLimit)
-        );
-
-        CompletableFuture.allOf(productsFuture, manufacturersFuture, categoriesFuture).join();
-
-        List<ProductSearchResult> products = productsFuture.join();
-        List<ManufacturerSearchResult> manufacturers = manufacturersFuture.join();
-        List<CategorySearchResult> categories = categoriesFuture.join();
+        List<ProductSearchResult> products = searchProductsInternal(trimmedSearchTerm, finalProductLimit);
+        List<ManufacturerSearchResult> manufacturers = searchManufacturersInternal(trimmedSearchTerm, finalManufacturerLimit);
+        List<CategorySearchResult> categories = searchCategoriesInternal(trimmedSearchTerm, finalCategoryLimit);
 
         long searchTime = System.currentTimeMillis() - startTime;
 
@@ -146,11 +132,10 @@ public class GlobalSearchServiceImpl implements GlobalSearchService {
     }
 
     @Override
-    @CacheEvict(value = "globalSearch", key = "#searchTerm + ':*'")
     public void clearSearchCacheForTerm(String searchTerm) {
         log.info("Clearing search cache for term: {}", searchTerm);
-        String cacheKey = SEARCH_CACHE_PREFIX + searchTerm;
-        redisTemplate.delete(cacheKey);
+        String pattern = SEARCH_CACHE_PREFIX + searchTerm + "*";
+        redisTemplate.keys(pattern).forEach(redisTemplate::delete);
     }
 
     private List<ProductSearchResult> searchProductsInternal(String searchTerm, int limit) {
@@ -166,15 +151,50 @@ public class GlobalSearchServiceImpl implements GlobalSearchService {
                     .map(Product::getId)
                     .collect(Collectors.toList());
 
-            List<Product> productsWithDetails = productSearchRepository.findByIdsWithManufacturerAndCategories(productIds);
+            List<Product> productsWithManufacturer = productSearchRepository.findByIdsWithManufacturer(productIds);
 
-            return productsWithDetails.stream()
-                    .map(this::buildProductSearchResult)
+            Map<UUID, List<String>> manufacturerCategoriesMap = fetchManufacturerCategories(
+                    productsWithManufacturer.stream()
+                            .filter(p -> p.getManufacturer() != null)
+                            .map(p -> p.getManufacturer().getId())
+                            .distinct()
+                            .collect(Collectors.toList())
+            );
+
+            List<Product> productsWithVariants = productSearchRepository.findByIdsWithVariants(productIds);
+
+            productsWithManufacturer.forEach(p -> productsWithVariants.stream()
+                    .filter(pv -> pv.getId().equals(p.getId()))
+                    .findFirst()
+                    .ifPresent(pv -> {
+                        if (pv.getVariantType() == VariantType.PARENT) {
+                            p.setVariants(pv.getVariants());
+                        }
+                    }));
+
+            return productsWithManufacturer.stream()
+                    .map(product -> buildProductSearchResult(product, manufacturerCategoriesMap))
                     .collect(Collectors.toList());
         } catch (Exception e) {
             log.error("Error searching products: {}", e.getMessage(), e);
             return new ArrayList<>();
         }
+    }
+
+    private Map<UUID, List<String>> fetchManufacturerCategories(List<UUID> manufacturerIds) {
+        if (manufacturerIds.isEmpty()) {
+            return Map.of();
+        }
+
+        List<Manufacturer> manufacturersWithCategories = manufacturerSearchRepository.findByIdsWithCategories(manufacturerIds);
+
+        return manufacturersWithCategories.stream()
+                .collect(Collectors.toMap(
+                        Manufacturer::getId,
+                        m -> m.getCategories().stream()
+                                .map(Category::getName)
+                                .collect(Collectors.toList())
+                ));
     }
 
     private List<ManufacturerSearchResult> searchManufacturersInternal(String searchTerm, int limit) {
@@ -215,7 +235,7 @@ public class GlobalSearchServiceImpl implements GlobalSearchService {
         }
     }
 
-    private ProductSearchResult buildProductSearchResult(Product product) {
+    private ProductSearchResult buildProductSearchResult(Product product, Map<UUID, List<String>> manufacturerCategoriesMap) {
         String thumbnailUrl = null;
         if (StringUtils.hasText(product.getThumbnailObjectKey())) {
             try {
@@ -232,8 +252,17 @@ public class GlobalSearchServiceImpl implements GlobalSearchService {
         }
 
         int variantCount = 0;
-        if (product.getVariantType() == VariantType.PARENT) {
+        if (product.getVariantType() == VariantType.PARENT && product.getVariants() != null) {
             variantCount = product.getVariants().size();
+        }
+
+        String manufacturerName = null;
+        List<String> categoryNames = new ArrayList<>();
+
+        if (product.getManufacturer() != null) {
+            manufacturerName = product.getManufacturer().getName();
+            UUID manufacturerId = product.getManufacturer().getId();
+            categoryNames = manufacturerCategoriesMap.getOrDefault(manufacturerId, new ArrayList<>());
         }
 
         return ProductSearchResult.builder()
@@ -245,8 +274,8 @@ public class GlobalSearchServiceImpl implements GlobalSearchService {
                 .price(product.getPrice())
                 .compareAtPrice(product.getCompareAtPrice())
                 .thumbnailUrl(thumbnailUrl)
-                .manufacturerName(product.getManufacturerName())
-                .categoryNames(product.getCategoryNames())
+                .manufacturerName(manufacturerName)
+                .categoryNames(categoryNames)
                 .isActive(product.getIsActive())
                 .isFeatured(product.getIsFeatured())
                 .variantType(product.getVariantType().name())

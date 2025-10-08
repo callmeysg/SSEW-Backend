@@ -46,6 +46,9 @@ public interface ProductSearchRepository extends JpaRepository<Product, UUID> {
             """)
     List<Product> searchProducts(@Param("searchTerm") String searchTerm);
 
-    @Query("SELECT p FROM Product p LEFT JOIN FETCH p.manufacturer m LEFT JOIN FETCH m.categories LEFT JOIN FETCH p.variants WHERE p.id IN :ids")
-    List<Product> findByIdsWithManufacturerAndCategories(@Param("ids") List<UUID> ids);
+    @Query("SELECT p FROM Product p LEFT JOIN FETCH p.manufacturer WHERE p.id IN :ids")
+    List<Product> findByIdsWithManufacturer(@Param("ids") List<UUID> ids);
+
+    @Query("SELECT DISTINCT p FROM Product p LEFT JOIN FETCH p.variants WHERE p.id IN :ids")
+    List<Product> findByIdsWithVariants(@Param("ids") List<UUID> ids);
 }
