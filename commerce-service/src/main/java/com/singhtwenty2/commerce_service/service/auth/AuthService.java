@@ -17,7 +17,8 @@ import com.singhtwenty2.commerce_service.data.dto.auth.ProfileDTO.ProfileRespons
 import com.singhtwenty2.commerce_service.data.dto.auth.ProfileDTO.UpdateProfileRequest;
 import com.singhtwenty2.commerce_service.data.dto.auth.RegisterDTO.RegisterRequest;
 import com.singhtwenty2.commerce_service.data.dto.auth.RegisterDTO.RegisterResponse;
-import com.singhtwenty2.commerce_service.data.dto.auth.TokenDTO.RotateTokenRequest;
+
+import static com.singhtwenty2.commerce_service.data.dto.auth.TokenDTO.RotateTokenRequest;
 
 public interface AuthService {
 
@@ -31,11 +32,13 @@ public interface AuthService {
 
     LoginResponse rotateTokens(RotateTokenRequest rotateTokenRequest);
 
-    void logout(RotateTokenRequest rotateTokenRequest);
+    void logout(RotateTokenRequest rotateTokenRequest, String accessToken);
 
-    void logoutAllDevices(String userId);
+    void logoutAllDevices(String userId, String currentAccessToken);
 
     ProfileResponse getUserProfile(String userId);
 
     ProfileResponse updateUserProfile(String userId, UpdateProfileRequest updateRequest);
+
+    void changePassword(String userId, String currentPassword, String newPassword);
 }

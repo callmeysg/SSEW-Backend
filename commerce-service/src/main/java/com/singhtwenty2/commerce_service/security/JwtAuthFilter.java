@@ -13,6 +13,7 @@ package com.singhtwenty2.commerce_service.security;
 
 import com.singhtwenty2.commerce_service.data.enums.UserRole;
 import com.singhtwenty2.commerce_service.service.aux.JwtService;
+import com.singhtwenty2.commerce_service.service.aux.TokenBlacklistService;
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
@@ -41,6 +42,7 @@ import java.util.UUID;
 public class JwtAuthFilter extends OncePerRequestFilter {
 
     private final JwtService jwtService;
+    private final TokenBlacklistService tokenBlacklistService;
 
     @Override
     protected void doFilterInternal(
@@ -62,6 +64,14 @@ public class JwtAuthFilter extends OncePerRequestFilter {
 
         try {
             String token = authHeader.substring(7);
+
+            if (tokenBlacklistService.isBlacklisted(token)) {
+                log.debug("Blocked blacklisted token");
+                response.setStatus(HttpServletResponse.SC_UNAUTHORIZED);
+                response.setContentType("application/json");
+                response.getWriter().write("{\"error\":\"Token has been revoked\"}");
+                return;
+            }
 
             if (!jwtService.validateAccessToken(token)) {
                 filterChain.doFilter(request, response);

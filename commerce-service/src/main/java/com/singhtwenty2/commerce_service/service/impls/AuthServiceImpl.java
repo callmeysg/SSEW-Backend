@@ -27,6 +27,7 @@ import com.singhtwenty2.commerce_service.data.repository.UserRepository;
 import com.singhtwenty2.commerce_service.security.EncoderService;
 import com.singhtwenty2.commerce_service.service.auth.AuthService;
 import com.singhtwenty2.commerce_service.service.aux.JwtService;
+import com.singhtwenty2.commerce_service.service.aux.TokenBlacklistService;
 import jakarta.servlet.http.HttpServletRequest;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -57,6 +58,7 @@ public class AuthServiceImpl implements AuthService {
     private final RefreshTokenRepository refreshTokenRepository;
     private final JwtService jwtService;
     private final EncoderService encoderService;
+    private final TokenBlacklistService tokenBlacklistService;
 
     private static final Pattern PHONE_PATTERN = Pattern.compile("^[+]?[1-9]\\d{1,14}$");
     private static final Pattern EMAIL_PATTERN = Pattern.compile("^[A-Za-z0-9+_.-]+@[A-Za-z0-9.-]+\\.[A-Za-z]{2,}$");
@@ -181,8 +183,16 @@ public class AuthServiceImpl implements AuthService {
     }
 
     @Override
-    public void logout(RotateTokenRequest rotateTokenRequest) {
+    public void logout(RotateTokenRequest rotateTokenRequest, String accessToken) {
         log.debug("Logout attempt");
+
+        if (StringUtils.hasText(accessToken)) {
+            long expirationMs = jwtService.getTokenExpirationMs(accessToken);
+            if (expirationMs > 0) {
+                tokenBlacklistService.blacklistToken(accessToken, expirationMs);
+                log.debug("Access token blacklisted");
+            }
+        }
 
         if (StringUtils.hasText(rotateTokenRequest.getRefreshTokenValue())) {
             Optional<RefreshToken> tokenOptional = refreshTokenRepository.findByToken(rotateTokenRequest.getRefreshTokenValue());
@@ -195,12 +205,23 @@ public class AuthServiceImpl implements AuthService {
     }
 
     @Override
-    public void logoutAllDevices(String userId) {
+    public void logoutAllDevices(String userId, String currentAccessToken) {
         log.debug("Logging out all devices for user: {}", userId);
 
         Optional<User> userOptional = userRepository.findById(UUID.fromString(userId));
         if (userOptional.isPresent()) {
-            refreshTokenRepository.revokeAllTokensForUser(userOptional.get());
+            User user = userOptional.get();
+            List<RefreshToken> activeSessions = refreshTokenRepository.findActiveTokensForUser(user, LocalDateTime.now());
+
+            refreshTokenRepository.revokeAllTokensForUser(user);
+
+            if (StringUtils.hasText(currentAccessToken)) {
+                long expirationMs = jwtService.getTokenExpirationMs(currentAccessToken);
+                if (expirationMs > 0) {
+                    tokenBlacklistService.blacklistToken(currentAccessToken, expirationMs);
+                }
+            }
+
             log.info("All tokens revoked for user: {}", userId);
         }
     }
@@ -282,6 +303,45 @@ public class AuthServiceImpl implements AuthService {
         }
 
         return getUserProfile(userId);
+    }
+
+    @Override
+    public void changePassword(String userId, String currentPassword, String newPassword) {
+        log.debug("Password change attempt for user: {}", userId);
+
+        User user = userRepository.findById(UUID.fromString(userId))
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "User not found"));
+
+        if (!StringUtils.hasText(currentPassword)) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Current password is required");
+        }
+
+        if (!encoderService.matches(currentPassword, user.getPassword())) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Current password is incorrect");
+        }
+
+        if (!StringUtils.hasText(newPassword)) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "New password is required");
+        }
+
+        if (currentPassword.equals(newPassword)) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "New password must be different from current password");
+        }
+
+        if (!PASSWORD_PATTERN.matcher(newPassword).matches()) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
+                    "Password must be at least 8 characters with uppercase, lowercase, number, and special character");
+        }
+
+        user.setPassword(encoderService.encode(newPassword));
+        user.setLastPasswordChange(LocalDateTime.now());
+        user.setFailedLoginAttempts(0);
+        user.setUpdatedAt(LocalDateTime.now());
+        userRepository.save(user);
+
+        refreshTokenRepository.revokeAllTokensForUser(user);
+
+        log.info("Password changed successfully for user: {}", userId);
     }
 
     private LoginResponse performLogin(User user) {

@@ -46,8 +46,12 @@ public class SecurityConfig {
                 .csrf(AbstractHttpConfigurer::disable)
                 .authorizeHttpRequests(auth -> auth
                         .requestMatchers(
-                                "/v1/auth/**",           // All auth endpoints
-                                "/v1/images/requirements/**", // Image requirement endpoints
+                                "/v1/auth/register",      // Register endpoint
+                                "/v1/auth/register-admin",// Register endpoint for ADMIN
+                                "/v1/auth/login",         // Login endpoint
+                                "/v1/auth/login-admin",   // Login endpoint for ADMIN
+                                "/v1/auth/rotate-tokens", // Rotate tokens endpoint
+                                "/v1/images/requirements/**",// Image requirement endpoints
                                 "/v1/public/**",         // Public API endpoints
                                 "/v1/health",            // Health check
                                 "/actuator/health",      // Spring Boot health actuator

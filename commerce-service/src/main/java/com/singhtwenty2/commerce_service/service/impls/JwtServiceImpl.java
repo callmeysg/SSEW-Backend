@@ -169,6 +169,20 @@ public class JwtServiceImpl implements JwtService {
         }
     }
 
+    @Override
+    public long getTokenExpirationMs(String token) {
+        Claims claims = parseAllClaims(token);
+        if (claims == null || claims.getExpiration() == null) {
+            return 0;
+        }
+
+        Date expiration = claims.getExpiration();
+        Date now = new Date();
+        long remainingMs = expiration.getTime() - now.getTime();
+
+        return Math.max(0, remainingMs);
+    }
+
     private boolean validateTokenByType(String token, String expectedType) {
         try {
             Claims claims = parseAllClaims(token);

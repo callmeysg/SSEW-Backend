@@ -11,21 +11,24 @@
  */
 package com.singhtwenty2.commerce_service.controller.auth;
 
+import com.singhtwenty2.commerce_service.data.dto.auth.PasswordDTO.ChangePasswordRequest;
 import com.singhtwenty2.commerce_service.data.dto.auth.ProfileDTO.ProfileResponse;
 import com.singhtwenty2.commerce_service.data.dto.auth.ProfileDTO.UpdateProfileRequest;
 import com.singhtwenty2.commerce_service.data.dto.auth.RegisterDTO.RegisterRequest;
 import com.singhtwenty2.commerce_service.data.dto.auth.RegisterDTO.RegisterResponse;
 import com.singhtwenty2.commerce_service.data.dto.common.GlobalApiResponse;
-import com.singhtwenty2.commerce_service.security.PrincipalUser;
 import com.singhtwenty2.commerce_service.service.auth.AuthService;
+import com.singhtwenty2.commerce_service.util.io.AuthenticationUtils;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.Authentication;
+import org.springframework.util.StringUtils;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.Base64;
@@ -190,10 +193,28 @@ public class AuthController {
     @PostMapping("/logout")
     public ResponseEntity<GlobalApiResponse<Map<String, Object>>> logout(
             @Valid @RequestBody RotateTokenRequest rotateTokenRequest,
-            HttpServletRequest request) {
-        log.info("Logout attempt from IP: {}", getClientIP(request));
+            HttpServletRequest httpRequest,
+            Authentication authentication
+    ) {
+        log.info("Logout attempt from IP: {}", getClientIP(httpRequest));
 
-        authService.logout(rotateTokenRequest);
+        String userId = AuthenticationUtils.extractUserId(authentication, httpRequest, "Logout all devices");
+        if (userId == null) {
+            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(
+                    GlobalApiResponse.<Map<String, Object>>builder()
+                            .success(false)
+                            .message("Unauthorized access")
+                            .build()
+            );
+        }
+
+        String authHeader = httpRequest.getHeader(HttpHeaders.AUTHORIZATION);
+        String accessToken = null;
+        if (StringUtils.hasText(authHeader) && authHeader.startsWith("Bearer ")) {
+            accessToken = authHeader.substring(7);
+        }
+
+        authService.logout(rotateTokenRequest, accessToken);
 
         return ResponseEntity.ok(
                 GlobalApiResponse.<Map<String, Object>>builder()
@@ -206,15 +227,28 @@ public class AuthController {
 
     @PostMapping("/logout-all-devices")
     public ResponseEntity<GlobalApiResponse<Map<String, Object>>> logoutAllDevices(
-            HttpServletRequest request,
+            HttpServletRequest httpRequest,
             Authentication authentication
     ) {
-        PrincipalUser user = (PrincipalUser) authentication.getPrincipal();
-        String userId = user.getUserId().toString();
+        String userId = AuthenticationUtils.extractUserId(authentication, httpRequest, "Logout all devices");
+        if (userId == null) {
+            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(
+                    GlobalApiResponse.<Map<String, Object>>builder()
+                            .success(false)
+                            .message("Unauthorized access")
+                            .build()
+            );
+        }
 
-        log.info("Logout all devices attempt from IP: {} for user: {}", getClientIP(request), userId);
+        log.info("Logout all devices attempt from IP: {} for user: {}", getClientIP(httpRequest), userId);
 
-        authService.logoutAllDevices(userId);
+        String authHeader = httpRequest.getHeader(HttpHeaders.AUTHORIZATION);
+        String accessToken = null;
+        if (StringUtils.hasText(authHeader) && authHeader.startsWith("Bearer ")) {
+            accessToken = authHeader.substring(7);
+        }
+
+        authService.logoutAllDevices(userId, accessToken);
 
         return ResponseEntity.ok(
                 GlobalApiResponse.<Map<String, Object>>builder()
@@ -228,12 +262,19 @@ public class AuthController {
     @GetMapping("/profile")
     public ResponseEntity<GlobalApiResponse<ProfileResponse>> getProfile(
             Authentication authentication,
-            HttpServletRequest request
+            HttpServletRequest httpRequest
     ) {
-        PrincipalUser user = (PrincipalUser) authentication.getPrincipal();
-        String userId = user.getUserId().toString();
+        String userId = AuthenticationUtils.extractUserId(authentication, httpRequest, "fetching profile");
+        if (userId == null) {
+            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(
+                    GlobalApiResponse.<ProfileResponse>builder()
+                            .success(false)
+                            .message("Unauthorized access")
+                            .build()
+            );
+        }
 
-        log.info("Profile fetch request from IP: {} for user: {}", getClientIP(request), userId);
+        log.info("Profile fetch request from IP: {} for user: {}", getClientIP(httpRequest), userId);
 
         ProfileResponse response = authService.getUserProfile(userId);
 
@@ -250,12 +291,19 @@ public class AuthController {
     public ResponseEntity<GlobalApiResponse<ProfileResponse>> updateProfile(
             @Valid @RequestBody UpdateProfileRequest updateRequest,
             Authentication authentication,
-            HttpServletRequest request
+            HttpServletRequest httpRequest
     ) {
-        PrincipalUser user = (PrincipalUser) authentication.getPrincipal();
-        String userId = user.getUserId().toString();
+        String userId = AuthenticationUtils.extractUserId(authentication, httpRequest, "updating profile");
+        if (userId == null) {
+            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(
+                    GlobalApiResponse.<ProfileResponse>builder()
+                            .success(false)
+                            .message("Unauthorized access")
+                            .build()
+            );
+        }
 
-        log.info("Profile update request from IP: {} for user: {}", getClientIP(request), userId);
+        log.info("Profile update request from IP: {} for user: {}", getClientIP(httpRequest), userId);
 
         ProfileResponse response = authService.updateUserProfile(userId, updateRequest);
 
@@ -266,6 +314,41 @@ public class AuthController {
                         .success(true)
                         .message("Profile updated successfully")
                         .data(response)
+                        .build()
+        );
+    }
+
+    @PostMapping("/change-password")
+    public ResponseEntity<GlobalApiResponse<Map<String, Object>>> changePassword(
+            @Valid @RequestBody ChangePasswordRequest changePasswordRequest,
+            Authentication authentication,
+            HttpServletRequest httpRequest
+    ) {
+        String userId = AuthenticationUtils.extractUserId(authentication, httpRequest, "change password");
+        if (userId == null) {
+            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(
+                    GlobalApiResponse.<Map<String, Object>>builder()
+                            .success(false)
+                            .message("Unauthorized access")
+                            .build()
+            );
+        }
+
+        log.info("Password change request from IP: {} for user: {}", getClientIP(httpRequest), userId);
+
+        authService.changePassword(
+                userId,
+                changePasswordRequest.getCurrentPassword(),
+                changePasswordRequest.getNewPassword()
+        );
+
+        log.info("Password changed successfully for user: {}", userId);
+
+        return ResponseEntity.ok(
+                GlobalApiResponse.<Map<String, Object>>builder()
+                        .success(true)
+                        .message("Password changed successfully. All active sessions have been logged out.")
+                        .data(null)
                         .build()
         );
     }
