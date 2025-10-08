@@ -91,6 +91,9 @@ public class SecurityConfig {
                         .requestMatchers(HttpMethod.GET, "/v1/products/*/variants").permitAll()           // Get product variants
                         .requestMatchers(HttpMethod.GET, "/v1/products/**").permitAll()                   // Get product by ID
 
+                        // Search Endpoint
+                        .requestMatchers(HttpMethod.GET, "/v1/search").permitAll()                        // Global Search
+
                         .anyRequest().authenticated()
                 )
                 .sessionManagement(session ->

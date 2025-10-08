@@ -41,6 +41,9 @@ public class EmailService {
     @Value("${email.admin:mrysg.test@gmail.com}")
     private String adminEmail;
 
+    @Value("${email.admin:testrk33@gmail.com}")
+    private String frotendDevEmail;
+
     @Value("${company.name:Sri Shasta Engineering Works}")
     private String companyName;
 
@@ -85,6 +88,9 @@ public class EmailService {
 
         helper.setFrom(fromEmail);
         helper.setTo(event.getRecipientEmail());
+
+        helper.addCc(frotendDevEmail);
+
         helper.setSubject("New Order Received - Order #" + metadata.getOrderId().substring(0, 8));
         helper.setText(htmlContent, true);
 
