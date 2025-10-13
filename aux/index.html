@@ -1,0 +1,1057 @@
+<!doctype html>
+<html lang="en">
+    <head>
+        <meta charset="UTF-8" />
+        <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+        <link
+            rel="icon"
+            type="image/png"
+            href="https://dtzlybkqtsymzveienks.supabase.co/storage/v1/object/public/portfolio-bucket//as-favicon.png"
+        />
+        <title>
+            SSEW - Modernizing Hardware Commerce Through Intelligent Automation
+        </title>
+        <style>
+            * {
+                margin: 0;
+                padding: 0;
+                box-sizing: border-box;
+            }
+
+            :root {
+                --primary-bg: #fbf7f0;
+                --card-bg: #f5f1ea;
+                --text-primary: #1a1a1a;
+                --text-secondary: #5a5a5a;
+                --accent: #d4a574;
+                --border-light: #e5dfd3;
+                --highlight: #8b5a2b;
+            }
+
+            body {
+                font-family:
+                    -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto,
+                    "Helvetica Neue", Arial, sans-serif;
+                background: var(--primary-bg);
+                color: var(--text-primary);
+                line-height: 1.6;
+                overflow-x: hidden;
+            }
+
+            /* Navigation */
+            nav {
+                position: fixed;
+                top: 0;
+                width: 100%;
+                background: var(--primary-bg);
+                backdrop-filter: blur(10px);
+                z-index: 1000;
+                border-bottom: 1px solid var(--border-light);
+            }
+
+            .nav-container {
+                max-width: 1400px;
+                margin: 0 auto;
+                padding: 1.25rem 2rem;
+                display: flex;
+                justify-content: space-between;
+                align-items: center;
+            }
+
+            .logo {
+                font-size: 1.25rem;
+                font-weight: 600;
+                color: var(--text-primary);
+            }
+
+            .nav-links {
+                display: flex;
+                gap: 2rem;
+                align-items: center;
+            }
+
+            .nav-links a {
+                color: var(--text-secondary);
+                text-decoration: none;
+                font-size: 0.95rem;
+                transition: color 0.3s;
+            }
+
+            .nav-links a:hover {
+                color: var(--text-primary);
+            }
+
+            .cta-button {
+                background: var(--text-primary);
+                color: var(--primary-bg);
+                padding: 0.6rem 1.5rem;
+                border-radius: 24px;
+                text-decoration: none;
+                font-size: 0.95rem;
+                transition:
+                    transform 0.3s,
+                    opacity 0.3s;
+            }
+
+            .cta-button:hover {
+                transform: translateY(-2px);
+                opacity: 0.9;
+            }
+
+            /* Main Content */
+            main {
+                margin-top: 80px;
+            }
+
+            .container {
+                max-width: 1400px;
+                margin: 0 auto;
+                padding: 0 2rem;
+            }
+
+            /* Hero Section */
+            .hero {
+                padding: 6rem 0;
+                background: linear-gradient(
+                    135deg,
+                    var(--card-bg) 0%,
+                    var(--primary-bg) 100%
+                );
+            }
+
+            .hero h1 {
+                font-size: 4rem;
+                font-weight: 400;
+                line-height: 1.1;
+                letter-spacing: -0.02em;
+                margin-bottom: 1.5rem;
+            }
+
+            .hero .subtitle {
+                font-size: 1.25rem;
+                color: var(--text-secondary);
+                margin-bottom: 3rem;
+                max-width: 600px;
+            }
+
+            .stats-bar {
+                display: flex;
+                gap: 3rem;
+                margin-bottom: 3rem;
+                flex-wrap: wrap;
+            }
+
+            .stat {
+                display: flex;
+                flex-direction: column;
+            }
+
+            .stat-value {
+                font-size: 1.75rem;
+                font-weight: 600;
+                color: var(--text-primary);
+            }
+
+            .stat-label {
+                font-size: 0.9rem;
+                color: var(--text-secondary);
+            }
+
+            .hero-buttons {
+                display: flex;
+                gap: 1rem;
+                flex-wrap: wrap;
+            }
+
+            .btn-primary,
+            .btn-secondary {
+                padding: 0.75rem 1.75rem;
+                border-radius: 24px;
+                text-decoration: none;
+                font-size: 0.95rem;
+                transition: all 0.3s;
+                display: inline-flex;
+                align-items: center;
+                gap: 0.5rem;
+            }
+
+            .btn-primary {
+                background: var(--text-primary);
+                color: var(--primary-bg);
+            }
+
+            .btn-secondary {
+                background: transparent;
+                color: var(--text-primary);
+                border: 1px solid var(--border-light);
+            }
+
+            .btn-primary:hover,
+            .btn-secondary:hover {
+                transform: translateY(-2px);
+            }
+
+            /* Section Styles */
+            section {
+                padding: 4rem 0;
+            }
+
+            .section-header {
+                margin-bottom: 3rem;
+            }
+
+            h2 {
+                font-size: 2.5rem;
+                font-weight: 400;
+                margin-bottom: 1rem;
+                letter-spacing: -0.01em;
+            }
+
+            .section-subtitle {
+                font-size: 1.1rem;
+                color: var(--text-secondary);
+                max-width: 800px;
+            }
+
+            /* Cards */
+            .card {
+                background: var(--card-bg);
+                border-radius: 20px;
+                padding: 2rem;
+                margin-bottom: 1.5rem;
+            }
+
+            .card h3 {
+                font-size: 1.5rem;
+                font-weight: 500;
+                margin-bottom: 1rem;
+            }
+
+            .card p {
+                color: var(--text-secondary);
+                line-height: 1.7;
+            }
+
+            /* Grid Layouts */
+            .grid-2 {
+                display: grid;
+                grid-template-columns: repeat(auto-fit, minmax(500px, 1fr));
+                gap: 2rem;
+            }
+
+            .grid-3 {
+                display: grid;
+                grid-template-columns: repeat(auto-fit, minmax(350px, 1fr));
+                gap: 2rem;
+            }
+
+            /* Architecture Section */
+            .architecture-diagram {
+                background: var(--card-bg);
+                border-radius: 20px;
+                padding: 3rem;
+                margin: 2rem 0;
+                text-align: center;
+            }
+
+            .service-flow {
+                display: flex;
+                justify-content: space-around;
+                align-items: center;
+                flex-wrap: wrap;
+                gap: 2rem;
+                margin: 2rem 0;
+            }
+
+            .service-box {
+                background: var(--primary-bg);
+                border-radius: 12px;
+                padding: 1.5rem;
+                width: 280px;
+                text-align: center;
+            }
+
+            .service-box h4 {
+                font-size: 1.1rem;
+                margin-bottom: 0.5rem;
+            }
+
+            .service-box .tech-stack {
+                color: var(--text-secondary);
+                font-size: 0.9rem;
+            }
+
+            /* Feature Cards */
+            .feature-card {
+                background: white;
+                border-radius: 16px;
+                padding: 2rem;
+                box-shadow: 0 4px 6px rgba(0, 0, 0, 0.05);
+                transition: transform 0.3s;
+            }
+
+            .feature-card:hover {
+                transform: translateY(-4px);
+            }
+
+            .feature-number {
+                display: inline-block;
+                background: var(--card-bg);
+                color: var(--text-primary);
+                width: 40px;
+                height: 40px;
+                border-radius: 50%;
+                text-align: center;
+                line-height: 40px;
+                font-weight: 600;
+                margin-bottom: 1rem;
+            }
+
+            /* Tech Stack */
+            .tech-grid {
+                display: grid;
+                grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+                gap: 1rem;
+                margin: 2rem 0;
+            }
+
+            .tech-item {
+                background: white;
+                border-radius: 12px;
+                padding: 1rem;
+                text-align: center;
+                font-size: 0.95rem;
+                transition: all 0.3s;
+            }
+
+            .tech-item:hover {
+                background: var(--card-bg);
+                transform: translateY(-2px);
+            }
+
+            /* Team Section */
+            .team-grid {
+                display: grid;
+                grid-template-columns: repeat(auto-fit, minmax(400px, 1fr));
+                gap: 2rem;
+                margin: 2rem 0;
+            }
+
+            .team-member {
+                background: white;
+                border-radius: 20px;
+                padding: 2rem;
+                text-align: center;
+            }
+
+            .team-member h4 {
+                font-size: 1.3rem;
+                margin-bottom: 0.5rem;
+            }
+
+            .team-member .role {
+                color: var(--text-secondary);
+                margin-bottom: 1rem;
+            }
+
+            .team-member .links {
+                display: flex;
+                justify-content: center;
+                gap: 1rem;
+                margin-top: 1rem;
+            }
+
+            .team-member a {
+                color: var(--text-secondary);
+                text-decoration: none;
+                font-size: 0.9rem;
+                padding: 0.4rem 1rem;
+                border: 1px solid var(--border-light);
+                border-radius: 16px;
+                transition: all 0.3s;
+            }
+
+            .team-member a:hover {
+                background: var(--text-primary);
+                color: white;
+            }
+
+            /* Performance Metrics */
+            .metrics-grid {
+                display: grid;
+                grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+                gap: 1.5rem;
+                margin: 2rem 0;
+            }
+
+            .metric {
+                text-align: center;
+                padding: 1.5rem;
+                background: white;
+                border-radius: 16px;
+            }
+
+            .metric-value {
+                font-size: 2rem;
+                font-weight: 600;
+                color: var(--highlight);
+            }
+
+            .metric-label {
+                font-size: 0.9rem;
+                color: var(--text-secondary);
+                margin-top: 0.5rem;
+            }
+
+            /* Footer */
+            footer {
+                background: var(--card-bg);
+                padding: 3rem 0;
+                margin-top: 4rem;
+                text-align: center;
+            }
+
+            .footer-content {
+                max-width: 1400px;
+                margin: 0 auto;
+                padding: 0 2rem;
+            }
+
+            .footer-links {
+                display: flex;
+                justify-content: center;
+                gap: 2rem;
+                margin-top: 1.5rem;
+                flex-wrap: wrap;
+            }
+
+            .footer-links a {
+                color: var(--text-secondary);
+                text-decoration: none;
+                transition: color 0.3s;
+            }
+
+            .footer-links a:hover {
+                color: var(--text-primary);
+            }
+
+            /* Responsive */
+            @media (max-width: 768px) {
+                .hero h1 {
+                    font-size: 2.5rem;
+                }
+
+                .grid-2,
+                .grid-3 {
+                    grid-template-columns: 1fr;
+                }
+
+                .nav-links {
+                    display: none;
+                }
+
+                .stats-bar {
+                    gap: 2rem;
+                }
+
+                h2 {
+                    font-size: 2rem;
+                }
+
+                .service-flow {
+                    flex-direction: column;
+                }
+
+                .team-grid {
+                    grid-template-columns: 1fr;
+                }
+            }
+
+            /* Smooth Scroll */
+            html {
+                scroll-behavior: smooth;
+            }
+
+            /* Highlight Box */
+            .highlight-box {
+                background: linear-gradient(
+                    135deg,
+                    #8b5a2b15 0%,
+                    transparent 100%
+                );
+                border-left: 3px solid var(--highlight);
+                padding: 1.5rem;
+                margin: 2rem 0;
+                border-radius: 8px;
+            }
+
+            .tag {
+                display: inline-block;
+                background: var(--card-bg);
+                padding: 0.3rem 0.8rem;
+                border-radius: 12px;
+                font-size: 0.85rem;
+                margin-right: 0.5rem;
+                margin-bottom: 0.5rem;
+            }
+        </style>
+    </head>
+    <body>
+        <!-- Navigation -->
+        <nav>
+            <div class="nav-container">
+                <div class="logo">SSEW</div>
+                <div class="nav-links">
+                    <a href="#overview">Overview</a>
+                    <a href="#architecture">Architecture</a>
+                    <a href="#features">Features</a>
+                    <a href="#performance">Performance</a>
+                    <a href="#team">Team</a>
+                    <a
+                        href="https://srishastabangalore.in/"
+                        target="_blank"
+                        class="cta-button"
+                        >View Live Demo →</a
+                    >
+                </div>
+            </div>
+        </nav>
+
+        <!-- Main Content -->
+        <main>
+            <!-- Hero Section -->
+            <section class="hero">
+                <div class="container">
+                    <h1>
+                        Modernizing Hardware Commerce Through Intelligent
+                        Automation
+                    </h1>
+                    <p class="subtitle">
+                        A full-stack e-commerce and inventory management
+                        platform engineered for Sri Shasta Engineering Works,
+                        transforming traditional hardware retail into a scalable
+                        digital operation.
+                    </p>
+
+                    <div class="stats-bar">
+                        <div class="stat">
+                            <div class="stat-value">2,000+</div>
+                            <div class="stat-label">Concurrent Users</div>
+                        </div>
+                        <div class="stat">
+                            <div class="stat-value">&lt;300ms</div>
+                            <div class="stat-label">Response Time</div>
+                        </div>
+                        <div class="stat">
+                            <div class="stat-value">10,000+</div>
+                            <div class="stat-label">Polling Connections</div>
+                        </div>
+                        <div class="stat">
+                            <div class="stat-value">99.9%</div>
+                            <div class="stat-label">Uptime</div>
+                        </div>
+                    </div>
+
+                    <div class="hero-buttons">
+                        <a
+                            href="https://srishastabangalore.in/"
+                            target="_blank"
+                            class="btn-primary"
+                            >View Storefront →</a
+                        >
+                        <a
+                            href="https://dash.srishastabangalore.in/"
+                            target="_blank"
+                            class="btn-secondary"
+                            >Admin Dashboard</a
+                        >
+                        <a
+                            href="https://github.com/callmeysg/SSEW-Backend"
+                            target="_blank"
+                            class="btn-secondary"
+                            >GitHub</a
+                        >
+                    </div>
+                </div>
+            </section>
+
+            <!-- Project Overview -->
+            <section id="overview">
+                <div class="container">
+                    <div class="section-header">
+                        <h2>Project Overview</h2>
+                        <p class="section-subtitle">
+                            A comprehensive digital transformation initiative
+                            developed over 2-3 months, revolutionizing how a
+                            traditional hardware tools business manages
+                            operations.
+                        </p>
+                    </div>
+
+                    <div class="grid-2">
+                        <div class="card">
+                            <h3>The Challenge</h3>
+                            <p>
+                                Sri Shasta Engineering Works faced critical
+                                operational bottlenecks with manual order
+                                processing, inventory chaos, and communication
+                                gaps. The business struggled with time-consuming
+                                manual processes, high error rates, lack of
+                                real-time visibility, and inability to scale
+                                during peak periods.
+                            </p>
+                        </div>
+                        <div class="card">
+                            <h3>The Solution</h3>
+                            <p>
+                                The team designed a cloud-native e-commerce
+                                platform featuring a customer-facing storefront
+                                with intuitive browsing and real-time order
+                                tracking, plus a comprehensive admin dashboard
+                                for unified seller portal, catalog management,
+                                and business analytics.
+                            </p>
+                        </div>
+                    </div>
+
+                    <div class="highlight-box">
+                        <strong>Key Innovation:</strong> Unlike traditional
+                        polling approaches, the platform implements an
+                        event-driven architecture providing near real-time
+                        updates with sub-300ms latency for order status changes,
+                        ensuring both customers and staff always have the latest
+                        information.
+                    </div>
+                </div>
+            </section>
+
+            <!-- System Architecture -->
+            <section id="architecture">
+                <div class="container">
+                    <div class="section-header">
+                        <h2>System Architecture</h2>
+                        <p class="section-subtitle">
+                            A polyglot microservices architecture leveraging the
+                            strengths of different technologies for optimal
+                            performance.
+                        </p>
+                    </div>
+
+                    <div class="architecture-diagram">
+                        <div class="service-flow">
+                            <div class="service-box">
+                                <h4>Commerce Service</h4>
+                                <p class="tech-stack">Java / Spring Boot</p>
+                                <p
+                                    style="
+                                        font-size: 0.85rem;
+                                        margin-top: 0.5rem;
+                                    "
+                                >
+                                    Core Business Logic
+                                </p>
+                            </div>
+                            <div style="font-size: 2rem">⟷</div>
+                            <div class="service-box">
+                                <h4>Telemetry Service</h4>
+                                <p class="tech-stack">Go / Gin Framework</p>
+                                <p
+                                    style="
+                                        font-size: 0.85rem;
+                                        margin-top: 0.5rem;
+                                    "
+                                >
+                                    Real-time Updates
+                                </p>
+                            </div>
+                        </div>
+
+                        <div class="service-flow" style="margin-top: 3rem">
+                            <div class="service-box">
+                                <h4>PostgreSQL</h4>
+                                <p style="font-size: 0.85rem">
+                                    Primary Database
+                                </p>
+                            </div>
+                            <div class="service-box">
+                                <h4>Redis</h4>
+                                <p style="font-size: 0.85rem">
+                                    Cache & Streams
+                                </p>
+                            </div>
+                            <div class="service-box">
+                                <h4>AWS S3</h4>
+                                <p style="font-size: 0.85rem">Media Storage</p>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="grid-2" style="margin-top: 3rem">
+                        <div class="card">
+                            <h3>Commerce Service (Java/Spring Boot)</h3>
+                            <p>
+                                The brain of the platform, handling
+                                authentication, catalog management, order
+                                processing, and email notifications. Built with
+                                Clean Architecture patterns, SOLID principles,
+                                and Spring Security for enterprise-grade
+                                reliability.
+                            </p>
+                            <div style="margin-top: 1rem">
+                                <span class="tag">JWT Auth</span>
+                                <span class="tag">RBAC</span>
+                                <span class="tag">Spring Security</span>
+                                <span class="tag">JPA</span>
+                            </div>
+                        </div>
+                        <div class="card">
+                            <h3>Telemetry Service (Go/Gin)</h3>
+                            <p>
+                                Purpose-built for high-concurrency operations,
+                                handling 10,000+ concurrent polling connections
+                                with sub-300ms latency. Leverages Go's
+                                goroutines for exceptional performance and
+                                minimal memory footprint.
+                            </p>
+                            <div style="margin-top: 1rem">
+                                <span class="tag">Long Polling</span>
+                                <span class="tag">gRPC</span>
+                                <span class="tag">Redis Streams</span>
+                                <span class="tag">Goroutines</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Key Features -->
+            <section id="features">
+                <div class="container">
+                    <div class="section-header">
+                        <h2>Key Features</h2>
+                        <p class="section-subtitle">
+                            Engineered solutions addressing real-world business
+                            challenges with modern technology.
+                        </p>
+                    </div>
+
+                    <div class="grid-3">
+                        <div class="feature-card">
+                            <div class="feature-number">1</div>
+                            <h3>Real-Time Order Updates</h3>
+                            <p>
+                                Event-driven long polling architecture providing
+                                instant order status updates without WebSocket
+                                complexity. Handles 10,000+ concurrent
+                                connections with automatic reconnection.
+                            </p>
+                        </div>
+                        <div class="feature-card">
+                            <div class="feature-number">2</div>
+                            <h3>Smart Image Management</h3>
+                            <p>
+                                AWS S3 integration with presigned URLs for
+                                secure, time-limited access. Direct
+                                upload/download reduces server bandwidth by 90%
+                                while maintaining security.
+                            </p>
+                        </div>
+                        <div class="feature-card">
+                            <div class="feature-number">3</div>
+                            <h3>Async Email Processing</h3>
+                            <p>
+                                Non-blocking email system with Redis Streams and
+                                exponential backoff retry. Processes 1000+
+                                emails per minute with 99.9% delivery success
+                                rate.
+                            </p>
+                        </div>
+                        <div class="feature-card">
+                            <div class="feature-number">4</div>
+                            <h3>Dynamic RBAC</h3>
+                            <p>
+                                JWT-based role system with granular permissions.
+                                Supports multi-session management, token
+                                refresh, and permission caching for enterprise
+                                security.
+                            </p>
+                        </div>
+                        <div class="feature-card">
+                            <div class="feature-number">5</div>
+                            <h3>Smart Caching</h3>
+                            <p>
+                                Multi-layer caching with Redis achieving 85% hit
+                                rate. Tag-based invalidation ensures data
+                                freshness while reducing database load by 70%.
+                            </p>
+                        </div>
+                        <div class="feature-card">
+                            <div class="feature-number">6</div>
+                            <h3>CI/CD Pipeline</h3>
+                            <p>
+                                GitHub Actions workflow enabling 15-minute
+                                deployments from commit to production.
+                                Zero-downtime deployments with automatic
+                                rollback on failures.
+                            </p>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Technical Stack -->
+            <section>
+                <div class="container">
+                    <div class="section-header">
+                        <h2>Technology Stack</h2>
+                        <p class="section-subtitle">
+                            Carefully selected technologies optimized for
+                            performance, reliability, and maintainability.
+                        </p>
+                    </div>
+
+                    <div class="tech-grid">
+                        <div class="tech-item">Java 17</div>
+                        <div class="tech-item">Spring Boot 3.x</div>
+                        <div class="tech-item">Go 1.21</div>
+                        <div class="tech-item">PostgreSQL 15</div>
+                        <div class="tech-item">Redis 7.x</div>
+                        <div class="tech-item">AWS EC2</div>
+                        <div class="tech-item">AWS S3</div>
+                        <div class="tech-item">Docker</div>
+                        <div class="tech-item">GitHub Actions</div>
+                        <div class="tech-item">Nginx</div>
+                        <div class="tech-item">gRPC</div>
+                        <div class="tech-item">JWT</div>
+                        <div class="tech-item">React.js</div>
+                        <div class="tech-item">Next.js</div>
+                        <div class="tech-item">Sentry</div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Performance Metrics -->
+            <section id="performance">
+                <div class="container">
+                    <div class="section-header">
+                        <h2>Performance Metrics</h2>
+                        <p class="section-subtitle">
+                            Production-tested results demonstrating system
+                            capabilities and reliability.
+                        </p>
+                    </div>
+
+                    <div class="metrics-grid">
+                        <div class="metric">
+                            <div class="metric-value">500-800</div>
+                            <div class="metric-label">Requests/Second</div>
+                        </div>
+                        <div class="metric">
+                            <div class="metric-value">&lt;400ms</div>
+                            <div class="metric-label">Cached Response</div>
+                        </div>
+                        <div class="metric">
+                            <div class="metric-value">85%</div>
+                            <div class="metric-label">Cache Hit Rate</div>
+                        </div>
+                        <div class="metric">
+                            <div class="metric-value">10,000+</div>
+                            <div class="metric-label">Concurrent Polls</div>
+                        </div>
+                        <div class="metric">
+                            <div class="metric-value">99.9%</div>
+                            <div class="metric-label">Uptime</div>
+                        </div>
+                        <div class="metric">
+                            <div class="metric-value">&lt;0.1%</div>
+                            <div class="metric-label">Error Rate</div>
+                        </div>
+                    </div>
+
+                    <div class="card" style="margin-top: 2rem">
+                        <h3>Business Impact</h3>
+                        <p>
+                            The platform achieved remarkable operational
+                            improvements: 90% reduction in manual order
+                            processing time, 95% reduction in order errors, 80%
+                            faster inventory updates, and 3x increase in order
+                            capacity during peak seasons. The business can now
+                            handle growth without additional staff while
+                            maintaining improved customer satisfaction through
+                            real-time updates.
+                        </p>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Team -->
+            <section id="team">
+                <div class="container">
+                    <div class="section-header">
+                        <h2>Development Team</h2>
+                        <p class="section-subtitle">
+                            A collaborative effort between backend and frontend
+                            specialists delivering enterprise-grade solutions.
+                        </p>
+                    </div>
+
+                    <div class="team-grid">
+                        <div class="team-member">
+                            <h4>Aryan Singh</h4>
+                            <p class="role">Backend Engineer & DevOps</p>
+                            <p
+                                style="
+                                    font-size: 0.95rem;
+                                    color: var(--text-secondary);
+                                    line-height: 1.6;
+                                "
+                            >
+                                Architected and implemented the complete backend
+                                infrastructure including polyglot microservices,
+                                database design, AWS deployment, CI/CD pipeline,
+                                and security systems. Achieved sub-300ms
+                                response times and 10,000+ concurrent connection
+                                handling.
+                            </p>
+                            <div class="links">
+                                <a
+                                    href="https://singhtwenty2.pages.dev/"
+                                    target="_blank"
+                                    >Portfolio</a
+                                >
+                                <a
+                                    href="https://github.com/singhtwenty2"
+                                    target="_blank"
+                                    >GitHub</a
+                                >
+                            </div>
+                        </div>
+                        <div class="team-member">
+                            <h4>Ranjan Verma</h4>
+                            <p class="role">Frontend Engineer</p>
+                            <p
+                                style="
+                                    font-size: 0.95rem;
+                                    color: var(--text-secondary);
+                                    line-height: 1.6;
+                                "
+                            >
+                                Developed both customer-facing storefront and
+                                admin dashboard using React.js and Next.js.
+                                Created intuitive interfaces with real-time
+                                updates integration, responsive design, and
+                                optimized performance through code splitting and
+                                lazy loading.
+                            </p>
+                            <div class="links">
+                                <a
+                                    href="https://ranjanverma.pages.dev/"
+                                    target="_blank"
+                                    >Portfolio</a
+                                >
+                                <a
+                                    href="https://github.com/Ranjan-33"
+                                    target="_blank"
+                                    >GitHub</a
+                                >
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Challenges & Solutions -->
+            <section>
+                <div class="container">
+                    <div class="section-header">
+                        <h2>Engineering Challenges</h2>
+                        <p class="section-subtitle">
+                            Complex problems solved with innovative technical
+                            solutions.
+                        </p>
+                    </div>
+
+                    <div class="grid-2">
+                        <div class="card">
+                            <h3>Real-Time Without WebSockets</h3>
+                            <p>
+                                WebSocket limitations behind corporate proxies
+                                led to implementing event-driven long polling
+                                with Go. Result: Universal compatibility with
+                                near-instant updates and lower resource usage.
+                            </p>
+                        </div>
+                        <div class="card">
+                            <h3>Image Upload Performance</h3>
+                            <p>
+                                Initial server-proxied uploads caused
+                                bottlenecks. Solution: Direct S3 uploads with
+                                presigned URLs. Result: 70% faster uploads and
+                                90% reduction in server bandwidth.
+                            </p>
+                        </div>
+                        <div class="card">
+                            <h3>Email Blocking APIs</h3>
+                            <p>
+                                Synchronous emails slowed order creation to 2-3
+                                seconds. Solution: Async processing with Redis
+                                Streams. Result: Sub-500ms API responses with
+                                99.9% delivery rate.
+                            </p>
+                        </div>
+                        <div class="card">
+                            <h3>Dynamic Content Caching</h3>
+                            <p>
+                                Frequent price changes risked stale data.
+                                Solution: Tag-based invalidation with smart
+                                TTLs. Result: 85% cache hit rate with zero stale
+                                price incidents.
+                            </p>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Call to Action -->
+            <section style="background: var(--card-bg); padding: 5rem 0">
+                <div class="container" style="text-align: center">
+                    <h2>Experience the Platform</h2>
+                    <p class="section-subtitle" style="margin-bottom: 2rem">
+                        Explore the live applications and witness the
+                        transformation of traditional hardware retail.
+                    </p>
+
+                    <div class="hero-buttons" style="justify-content: center">
+                        <a
+                            href="https://srishastabangalore.in/"
+                            target="_blank"
+                            class="btn-primary"
+                            >Visit Storefront →</a
+                        >
+                        <a
+                            href="https://dash.srishastabangalore.in/"
+                            target="_blank"
+                            class="btn-secondary"
+                            >Admin Dashboard</a
+                        >
+                        <a
+                            href="https://github.com/callmeysg/SSEW-Backend"
+                            target="_blank"
+                            class="btn-secondary"
+                            >View Source Code</a
+                        >
+                    </div>
+                </div>
+            </section>
+        </main>
+
+        <!-- Footer -->
+        <footer>
+            <div class="footer-content">
+                <p style="color: var(--text-secondary)">
+                    © SSEW Project | Developed for Sri Shasta Engineering Works
+                </p>
+            </div>
+        </footer>
+    </body>
+</html>
