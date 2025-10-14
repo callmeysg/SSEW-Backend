@@ -30,7 +30,7 @@ spring:
     redis:
       url: ${SPRING_DATA_REDIS_URL}
       ssl:
-        enabled: ${SPRING_DATA_REDIS_SSL_ENABLED:true}
+        enabled: false
       timeout: 3000ms
   main:
     banner-mode: off
