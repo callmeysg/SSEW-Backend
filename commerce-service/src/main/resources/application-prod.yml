@@ -92,7 +92,7 @@ aws:
   secretKey: ${AWS_SECRET_ACCESS_KEY}
 
 sentry:
-  dsn: ${SENTRY_AUTH_TOKEN}
+  dsn: ${SENTRY_DSN}
   send-default-pii: false
   logging:
     enabled: true
