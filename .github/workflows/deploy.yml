@@ -137,8 +137,8 @@ jobs:
             echo " pulling latest commerce-service image..."
             docker-compose pull commerce-service
             
-            echo " recreating commerce-service container..."
-            docker-compose up -d --force-recreate --no-deps commerce-service
+            echo " recreating commerce-service container and ensuring dependencies are up..."
+            docker-compose up -d --force-recreate commerce-service
             
             echo " removing old/unused docker images (older than 1 hour)..."
             docker image prune -af --filter "until=1h"

@@ -131,8 +131,8 @@ jobs:
             echo " pulling latest telemetry-service image..."
             docker-compose pull telemetry-service
 
-            echo " recreating telemetry-service container..."
-            docker-compose up -d --force-recreate --no-deps telemetry-service
+            echo " recreating telemetry-service container and ensuring dependencies are up..."
+            docker-compose up -d --force-recreate telemetry-service
 
             echo " removing old/unused docker images (older than 1 hour)..."
             docker image prune -af --filter "until=1h"
