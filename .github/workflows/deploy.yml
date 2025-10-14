@@ -75,15 +75,15 @@ jobs:
             
             curl -o docker-compose.yml https://raw.githubusercontent.com/${{ github.repository }}/main/docker-compose.yml
             
-            # Preserve existing TELEMETRY_IMAGE_TAG if it exists
+            # FIXED: Read and preserve the OTHER service's tag before writing the new .env file
             if [ -f .env ]; then
-              export $(grep -v '^#' .env | xargs)
+              export PRESERVED_TELEMETRY_TAG=$(grep '^TELEMETRY_IMAGE_TAG=' .env | cut -d '=' -f2)
             fi
 
             # Create .env file from GitHub Secrets for production
             cat > .env << EOF
             COMMERCE_IMAGE_TAG=prod-${{ steps.build-number.outputs.BUILD_NUMBER }}
-            TELEMETRY_IMAGE_TAG=${TELEMETRY_IMAGE_TAG:-prod-latest}
+            TELEMETRY_IMAGE_TAG=${PRESERVED_TELEMETRY_TAG:-prod-latest}
             
             # --- Application Profiles ---
             SPRING_PROFILES_ACTIVE=prod
@@ -107,6 +107,7 @@ jobs:
             JWT_SECRET=${{ secrets.PROD_JWT_SECRET }}
             APP_DEVELOPER_SECRET=${{ secrets.PROD_APP_DEVELOPER_SECRET }}
             SENTRY_AUTH_TOKEN=${{ secrets.SENTRY_AUTH_TOKEN }}
+            SENTRY_DSN=${{ secrets.PROD_SENTRY_DSN }}
             
             # --- Mail Credentials ---
             MAIL_USERNAME=${{ secrets.PROD_MAIL_USERNAME }}
