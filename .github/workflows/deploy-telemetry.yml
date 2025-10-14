@@ -54,8 +54,8 @@ jobs:
           platforms: linux/amd64
           push: true
           tags: |
-            ${{ env.IMAGE_NAME }}:staging-${{ steps.build-number.outputs.BUILD_NUMBER }}
-            ${{ env.IMAGE_NAME }}:staging-latest
+            ${{ env.IMAGE_NAME }}:prod-${{ steps.build-number.outputs.BUILD_NUMBER }}
+            ${{ env.IMAGE_NAME }}:prod-latest
 
       - name: Deploy Telemetry Service to EC2
         uses: appleboy/ssh-action@v1.0.0
@@ -69,31 +69,46 @@ jobs:
 
             curl -o docker-compose.yml https://raw.githubusercontent.com/${{ github.repository }}/main/docker-compose.yml
 
+            # Preserve existing COMMERCE_IMAGE_TAG if it exists
             if [ -f .env ]; then
               export $(grep -v '^#' .env | xargs)
             fi
             
+            # Create .env file from GitHub Secrets for production
             cat > .env << EOF
-            COMMERCE_IMAGE_TAG=${COMMERCE_IMAGE_TAG:-staging-latest}
-            TELEMETRY_IMAGE_TAG=staging-${{ steps.build-number.outputs.BUILD_NUMBER }}
-            JWT_SECRET=${{ secrets.JWT_SECRET }}
-            REDIS_PASSWORD=redis_staging_pass
-            AWS_ACCESS_KEY_ID=${{ secrets.AWS_ACCESS_KEY_ID }}
-            AWS_SECRET_ACCESS_KEY=${{ secrets.AWS_SECRET_ACCESS_KEY }}
-            APP_DEVELOPER_SECRET=${{ secrets.APP_DEVELOPER_SECRET }}
-            SENTRY_AUTH_TOKEN=${{ secrets.SENTRY_AUTH_TOKEN }}
-            POSTGRES_DB=ssew
-            POSTGRES_USER=ssew_owner
-            POSTGRES_PASSWORD=ssew_staging_pass
-            AWS_REGION=ap-south-1
-            AWS_S3_TEMP_BUCKET=ssew-bucket-staging
+            COMMERCE_IMAGE_TAG=${COMMERCE_IMAGE_TAG:-prod-latest}
+            TELEMETRY_IMAGE_TAG=prod-${{ steps.build-number.outputs.BUILD_NUMBER }}
+            
+            # --- Application Profiles ---
+            SPRING_PROFILES_ACTIVE=prod
+            ENVIRONMENT=prod
+            
+            # --- Database & Cache Credentials ---
+            POSTGRES_DB=${{ secrets.PROD_POSTGRES_DB }}
+            POSTGRES_USER=${{ secrets.PROD_POSTGRES_USER }}
+            POSTGRES_PASSWORD=${{ secrets.PROD_POSTGRES_PASSWORD }}
+            REDIS_PASSWORD=${{ secrets.PROD_REDIS_PASSWORD }}
+            
+            # --- AWS Credentials ---
+            AWS_REGION=${{ secrets.PROD_AWS_REGION }}
+            AWS_S3_TEMP_BUCKET=${{ secrets.PROD_AWS_S3_BUCKET }}
             AWS_S3_TEMP_FOLDER=temp
             AWS_S3_PERMANENT_FOLDER=permanent
-            MAIL_USERNAME=${{ secrets.MAIL_USERNAME }}
-            MAIL_PASSWORD=${{ secrets.MAIL_PASSWORD }}
-            ENVIRONMENT=staging
-            LOG_LEVEL=debug
-            CORS_ALLOWED_ORIGINS=http://localhost:3000,https://ssew-dashboard.pages.dev,https://srishastabangalore.in,https://dash.srishastabangalore.in,https://www.srishastabangalore.in
+            AWS_ACCESS_KEY_ID=${{ secrets.AWS_ACCESS_KEY_ID }}
+            AWS_SECRET_ACCESS_KEY=${{ secrets.AWS_SECRET_ACCESS_KEY }}
+            
+            # --- Security & API Keys ---
+            JWT_SECRET=${{ secrets.PROD_JWT_SECRET }}
+            APP_DEVELOPER_SECRET=${{ secrets.PROD_APP_DEVELOPER_SECRET }}
+            SENTRY_AUTH_TOKEN=${{ secrets.SENTRY_AUTH_TOKEN }}
+            
+            # --- Mail Credentials ---
+            MAIL_USERNAME=${{ secrets.PROD_MAIL_USERNAME }}
+            MAIL_PASSWORD=${{ secrets.PROD_MAIL_PASSWORD }}
+            
+            # --- Telemetry Service Config ---
+            LOG_LEVEL=info
+            CORS_ALLOWED_ORIGINS=${{ secrets.PROD_CORS_ALLOWED_ORIGINS }}
             CORS_ALLOWED_METHODS=GET,POST,PUT,DELETE,PATCH,OPTIONS,HEAD
             CORS_ALLOWED_HEADERS=Authorization,Content-Type,X-Requested-With,Accept,Origin,Access-Control-Request-Method,Access-Control-Request-Headers
             MAX_EVENTS_PER_POLL=50
