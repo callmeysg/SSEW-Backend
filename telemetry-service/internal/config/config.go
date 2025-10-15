@@ -20,61 +20,56 @@ import (
 )
 
 type Config struct {
-	Port        string
-	Environment string
-
-	RedisURL string
-
-	JWTSecret string
-
-	LogLevel string
-
+	Port              string
+	Environment       string
+	RedisURL          string
+	JWTSecret         string
+	LogLevel          string
 	CORSAllowedOrigins []string
 	CORSAllowedMethods []string
 	CORSAllowedHeaders []string
-
-	MaxEventsPerPoll  int
-	DefaultTTLSeconds int64
-	ShortPollInterval int64
-	LongPollInterval  int64
-	LongPollTimeout   int64
-
-	WorkerPoolSize    int
-	RedisPoolSize     int
-	RedisMinIdleConns int
+	MaxEventsPerPoll   int
+	DefaultTTLSeconds  int64
+	ShortPollInterval  int64
+	LongPollInterval   int64
+	LongPollTimeout    int64
+	WorkerPoolSize     int
+	RedisPoolSize      int
+	RedisMinIdleConns  int
 }
 
 var AppConfig *Config
 
 func LoadConfig() {
-	if err := godotenv.Load(); err != nil {
-		log.Printf("Warning: .env file not found")
+	_ = godotenv.Load()
+
+	redisURL := os.Getenv("REDIS_URL")
+	if redisURL == "" {
+		log.Fatal("REDIS_URL environment variable is required")
 	}
 
 	AppConfig = &Config{
-		Port:        getEnv("PORT", "9001"),
-		Environment: getEnv("ENVIRONMENT", "development"),
-
-		RedisURL: getEnv("REDIS_URL", "redis://localhost:6379/0"),
-
-		JWTSecret: getEnv("JWT_SECRET", "default_secret"),
-
-		LogLevel: getEnv("LOG_LEVEL", "info"),
-
+		Port:               getEnv("PORT", "9001"),
+		Environment:        getEnv("ENVIRONMENT", "development"),
+		RedisURL:           redisURL,
+		JWTSecret:          getEnv("JWT_SECRET", "default_secret"),
+		LogLevel:           getEnv("LOG_LEVEL", "info"),
 		CORSAllowedOrigins: strings.Split(getEnv("CORS_ALLOWED_ORIGINS", "*"), ","),
 		CORSAllowedMethods: strings.Split(getEnv("CORS_ALLOWED_METHODS", "GET,POST,PUT,DELETE,OPTIONS"), ","),
 		CORSAllowedHeaders: strings.Split(getEnv("CORS_ALLOWED_HEADERS", "Origin,Content-Type,Authorization"), ","),
-
-		MaxEventsPerPoll:  getEnvAsInt("MAX_EVENTS_PER_POLL", 50),
-		DefaultTTLSeconds: getEnvAsInt64("DEFAULT_TTL_SECONDS", 300),
-		ShortPollInterval: getEnvAsInt64("SHORT_POLL_INTERVAL_MS", 5000),
-		LongPollInterval:  getEnvAsInt64("LONG_POLL_INTERVAL_MS", 30000),
-		LongPollTimeout:   getEnvAsInt64("LONG_POLL_TIMEOUT_MS", 25000),
-
-		WorkerPoolSize:    getEnvAsInt("WORKER_POOL_SIZE", 100),
-		RedisPoolSize:     getEnvAsInt("REDIS_POOL_SIZE", 50),
-		RedisMinIdleConns: getEnvAsInt("REDIS_MIN_IDLE_CONNS", 10),
+		MaxEventsPerPoll:   getEnvAsInt("MAX_EVENTS_PER_POLL", 50),
+		DefaultTTLSeconds:  getEnvAsInt64("DEFAULT_TTL_SECONDS", 300),
+		ShortPollInterval:  getEnvAsInt64("SHORT_POLL_INTERVAL_MS", 5000),
+		LongPollInterval:   getEnvAsInt64("LONG_POLL_INTERVAL_MS", 30000),
+		LongPollTimeout:    getEnvAsInt64("LONG_POLL_TIMEOUT_MS", 25000),
+		WorkerPoolSize:     getEnvAsInt("WORKER_POOL_SIZE", 100),
+		RedisPoolSize:      getEnvAsInt("REDIS_POOL_SIZE", 50),
+		RedisMinIdleConns:  getEnvAsInt("REDIS_MIN_IDLE_CONNS", 10),
 	}
+
+	log.Printf("Configuration loaded: Environment=%s, RedisURL=%s (password hidden)", 
+		AppConfig.Environment, 
+		hideRedisPassword(AppConfig.RedisURL))
 }
 
 func getEnv(key, defaultValue string) string {
@@ -98,4 +93,17 @@ func getEnvAsInt64(key string, defaultValue int64) int64 {
 		return value
 	}
 	return defaultValue
+}
+
+func hideRedisPassword(redisURL string) string {
+	if strings.Contains(redisURL, "@") {
+		parts := strings.Split(redisURL, "@")
+		if len(parts) == 2 {
+			schemeParts := strings.Split(parts[0], "://")
+			if len(schemeParts) == 2 {
+				return schemeParts[0] + "://***:***@" + parts[1]
+			}
+		}
+	}
+	return redisURL
 }
