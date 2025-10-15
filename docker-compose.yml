@@ -99,6 +99,7 @@ services:
     environment:
       PORT: 9001
       ENVIRONMENT: ${ENVIRONMENT:-prod}
+      GIN_MODE: release
       REDIS_HOST: redis
       REDIS_PORT: 6379
       REDIS_PASSWORD: ${REDIS_PASSWORD}
