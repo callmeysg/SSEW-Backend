@@ -15,9 +15,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"log"
-	"net/url"
-	"strconv"
-	"strings"
 	"time"
 
 	"github.com/callmeysg/SSEW-Backend/telemetry-service/internal/config"
@@ -29,17 +26,19 @@ type RedisEventRepository struct {
 	client *redis.Client
 }
 
-func NewRedisEventRepository(redisURL string) (*RedisEventRepository, error) {
-	opt, err := parseRedisURL(redisURL)
-	if err != nil {
-		return nil, fmt.Errorf("failed to parse Redis URL: %w", err)
-	}
+func NewRedisEventRepository() (*RedisEventRepository, error) {
+	addr := fmt.Sprintf("%s:%s", config.AppConfig.RedisHost, config.AppConfig.RedisPort)
 
-	opt.PoolSize = config.AppConfig.RedisPoolSize
-	opt.MinIdleConns = config.AppConfig.RedisMinIdleConns
-	opt.MaxRetries = 3
-	opt.ReadTimeout = 3 * time.Second
-	opt.WriteTimeout = 3 * time.Second
+	opt := &redis.Options{
+		Addr:         addr,
+		Password:     config.AppConfig.RedisPassword,
+		DB:           config.AppConfig.RedisDB,
+		PoolSize:     config.AppConfig.RedisPoolSize,
+		MinIdleConns: config.AppConfig.RedisMinIdleConns,
+		MaxRetries:   3,
+		ReadTimeout:  3 * time.Second,
+		WriteTimeout: 3 * time.Second,
+	}
 
 	client := redis.NewClient(opt)
 
@@ -47,48 +46,14 @@ func NewRedisEventRepository(redisURL string) (*RedisEventRepository, error) {
 	defer cancel()
 
 	if err := client.Ping(ctx).Err(); err != nil {
-		return nil, fmt.Errorf("failed to connect to Redis: %w", err)
+		return nil, fmt.Errorf("failed to connect to Redis at %s: %w", addr, err)
 	}
 
-	log.Printf("Successfully connected to Redis at %s", opt.Addr)
+	log.Printf("Successfully connected to Redis at %s", addr)
 
 	return &RedisEventRepository{
 		client: client,
 	}, nil
-}
-
-func parseRedisURL(redisURL string) (*redis.Options, error) {
-	u, err := url.Parse(redisURL)
-	if err != nil {
-		return nil, fmt.Errorf("invalid Redis URL: %w", err)
-	}
-
-	opt := &redis.Options{
-		Addr: "localhost:6379",
-		DB:   0,
-	}
-
-	if u.Host != "" {
-		opt.Addr = u.Host
-	}
-
-	if u.User != nil {
-		if password, ok := u.User.Password(); ok {
-			opt.Password = password
-		}
-	}
-
-	if u.Path != "" {
-		path := strings.TrimPrefix(u.Path, "/")
-		if path != "" {
-			db, err := strconv.Atoi(path)
-			if err == nil {
-				opt.DB = db
-			}
-		}
-	}
-
-	return opt, nil
 }
 
 func (r *RedisEventRepository) Ping(ctx context.Context) error {

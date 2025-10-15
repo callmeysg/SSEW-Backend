@@ -37,7 +37,7 @@ func main() {
 		gin.SetMode(gin.ReleaseMode)
 	}
 
-	redisRepo, err := repository.NewRedisEventRepository(config.AppConfig.RedisURL)
+	redisRepo, err := repository.NewRedisEventRepository()
 	if err != nil {
 		log.Fatalf("Failed to connect to Redis: %v", err)
 	}

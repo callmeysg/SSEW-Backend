@@ -20,11 +20,14 @@ import (
 )
 
 type Config struct {
-	Port              string
-	Environment       string
-	RedisURL          string
-	JWTSecret         string
-	LogLevel          string
+	Port               string
+	Environment        string
+	RedisHost          string
+	RedisPort          string
+	RedisPassword      string
+	RedisDB            int
+	JWTSecret          string
+	LogLevel           string
 	CORSAllowedOrigins []string
 	CORSAllowedMethods []string
 	CORSAllowedHeaders []string
@@ -43,15 +46,13 @@ var AppConfig *Config
 func LoadConfig() {
 	_ = godotenv.Load()
 
-	redisURL := os.Getenv("REDIS_URL")
-	if redisURL == "" {
-		log.Fatal("REDIS_URL environment variable is required")
-	}
-
 	AppConfig = &Config{
 		Port:               getEnv("PORT", "9001"),
 		Environment:        getEnv("ENVIRONMENT", "development"),
-		RedisURL:           redisURL,
+		RedisHost:          getEnv("REDIS_HOST", "localhost"),
+		RedisPort:          getEnv("REDIS_PORT", "6379"),
+		RedisPassword:      getEnv("REDIS_PASSWORD", ""),
+		RedisDB:            getEnvAsInt("REDIS_DB", 0),
 		JWTSecret:          getEnv("JWT_SECRET", "default_secret"),
 		LogLevel:           getEnv("LOG_LEVEL", "info"),
 		CORSAllowedOrigins: strings.Split(getEnv("CORS_ALLOWED_ORIGINS", "*"), ","),
@@ -67,9 +68,11 @@ func LoadConfig() {
 		RedisMinIdleConns:  getEnvAsInt("REDIS_MIN_IDLE_CONNS", 10),
 	}
 
-	log.Printf("Configuration loaded: Environment=%s, RedisURL=%s (password hidden)", 
-		AppConfig.Environment, 
-		hideRedisPassword(AppConfig.RedisURL))
+	log.Printf("Configuration loaded: Environment=%s, RedisHost=%s, RedisPort=%s, RedisDB=%d",
+		AppConfig.Environment,
+		AppConfig.RedisHost,
+		AppConfig.RedisPort,
+		AppConfig.RedisDB)
 }
 
 func getEnv(key, defaultValue string) string {
@@ -93,17 +96,4 @@ func getEnvAsInt64(key string, defaultValue int64) int64 {
 		return value
 	}
 	return defaultValue
-}
-
-func hideRedisPassword(redisURL string) string {
-	if strings.Contains(redisURL, "@") {
-		parts := strings.Split(redisURL, "@")
-		if len(parts) == 2 {
-			schemeParts := strings.Split(parts[0], "://")
-			if len(schemeParts) == 2 {
-				return schemeParts[0] + "://***:***@" + parts[1]
-			}
-		}
-	}
-	return redisURL
 }
