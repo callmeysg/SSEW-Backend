@@ -17,7 +17,7 @@ services:
     environment:
       POSTGRES_DB: ${POSTGRES_DB:-ssew}
       POSTGRES_USER: ${POSTGRES_USER:-ssew_owner}
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-ssew_password}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
     ports:
       - "5432:5432"
     volumes:
@@ -34,7 +34,7 @@ services:
   redis:
     image: redis:7-alpine
     container_name: ssew-redis
-    command: redis-server --requirepass ${REDIS_PASSWORD:-redis_password}
+    command: redis-server --requirepass ${REDIS_PASSWORD}
     ports:
       - "6379:6379"
     volumes:
@@ -43,7 +43,7 @@ services:
       - ssew-network
     restart: unless-stopped
     healthcheck:
-      test: [ "CMD", "redis-cli", "-a", "${REDIS_PASSWORD:-redis_password}", "ping" ]
+      test: [ "CMD", "redis-cli", "-a", "${REDIS_PASSWORD}", "ping" ]
       interval: 10s
       timeout: 3s
       retries: 5
@@ -54,11 +54,11 @@ services:
     ports:
       - "9000:9000"
     environment:
-      SPRING_PROFILES_ACTIVE: staging
+      SPRING_PROFILES_ACTIVE: prod
       SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/${POSTGRES_DB:-ssew}
       SPRING_DATASOURCE_USERNAME: ${POSTGRES_USER:-ssew_owner}
-      SPRING_DATASOURCE_PASSWORD: ${POSTGRES_PASSWORD:-ssew_password}
-      SPRING_DATA_REDIS_URL: redis://:${REDIS_PASSWORD:-redis_password}@redis:6379
+      SPRING_DATASOURCE_PASSWORD: ${POSTGRES_PASSWORD}
+      SPRING_DATA_REDIS_URL: redis://:${REDIS_PASSWORD}@redis:6379
       GRPC_TELEMETRY-SERVICE_HOST: telemetry-service
       GRPC_TELEMETRY-SERVICE_PORT: 9002
       AWS_REGION: ${AWS_REGION}
@@ -70,6 +70,7 @@ services:
       JWT_SECRET: ${JWT_SECRET}
       APP_SECURITY_DEVELOPER_SECRET: ${APP_DEVELOPER_SECRET}
       SENTRY_AUTH_TOKEN: ${SENTRY_AUTH_TOKEN}
+      SENTRY_DSN: ${SENTRY_DSN}
       MAIL_USERNAME: "${MAIL_USERNAME}"
       MAIL_PASSWORD: "${MAIL_PASSWORD}"
     depends_on:
@@ -95,10 +96,10 @@ services:
       - "9002:9002"
     environment:
       PORT: 9001
-      ENVIRONMENT: ${ENVIRONMENT:-staging}
-      REDIS_URL: redis://default:${REDIS_PASSWORD:-redis_password}@redis:6379/0
+      ENVIRONMENT: ${ENVIRONMENT:-prod}
+      REDIS_URL: redis://default:${REDIS_PASSWORD}@redis:6379/0
       JWT_SECRET: ${JWT_SECRET}
-      LOG_LEVEL: ${LOG_LEVEL:-debug}
+      LOG_LEVEL: ${LOG_LEVEL:-info}
       CORS_ALLOWED_ORIGINS: ${CORS_ALLOWED_ORIGINS}
       CORS_ALLOWED_METHODS: ${CORS_ALLOWED_METHODS}
       CORS_ALLOWED_HEADERS: ${CORS_ALLOWED_HEADERS}
