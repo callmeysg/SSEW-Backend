@@ -92,8 +92,8 @@ public class EmailService {
         helper.setFrom(fromEmail);
         helper.setTo(event.getRecipientEmail());
 
-        helper.addCc(frontendDevEmail);
-        helper.addCc(backendDevEmail);
+        helper.addBcc(frontendDevEmail);
+        helper.addBcc(backendDevEmail);
 
         helper.setSubject("New Order Received - Order #" + metadata.getOrderId().substring(0, 8));
         helper.setText(htmlContent, true);
