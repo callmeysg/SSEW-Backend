@@ -75,6 +75,10 @@ services:
       SENTRY_DSN: ${SENTRY_DSN}
       MAIL_USERNAME: "${MAIL_USERNAME}"
       MAIL_PASSWORD: "${MAIL_PASSWORD}"
+      BACKUP_ENABLED: ${BACKUP_ENABLED:-true}
+      BACKUP_SCHEDULE: ${BACKUP_SCHEDULE:-0 0 3 * * *}
+      BACKUP_S3_FOLDER: ${BACKUP_S3_FOLDER:-database-backups}
+      BACKUP_RETENTION_COUNT: ${BACKUP_RETENTION_COUNT:-3}
     depends_on:
       postgres:
         condition: service_healthy
@@ -84,7 +88,7 @@ services:
       - ssew-network
     restart: unless-stopped
     healthcheck:
-      test: [ "CMD", "curl", "-f", "http://localhost:9000/actuator/health" ]
+      test: [ "CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:9000/actuator/health" ]
       interval: 30s
       timeout: 10s
       retries: 3

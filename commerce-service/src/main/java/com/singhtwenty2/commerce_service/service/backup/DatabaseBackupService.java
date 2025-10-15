@@ -20,16 +20,17 @@ import software.amazon.awssdk.core.sync.RequestBody;
 import software.amazon.awssdk.services.s3.S3Client;
 import software.amazon.awssdk.services.s3.model.*;
 
+import javax.sql.DataSource;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.sql.Connection;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.Comparator;
 import java.util.List;
-import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
 import java.util.zip.GZIPOutputStream;
 
@@ -39,21 +40,13 @@ import java.util.zip.GZIPOutputStream;
 public class DatabaseBackupService {
 
     private final S3Client s3Client;
+    private final DataSource dataSource;
 
     @Value("${aws.s3.temp-bucket}")
     private String s3Bucket;
 
-    @Value("${aws.region}")
-    private String awsRegion;
-
     @Value("${spring.datasource.username}")
     private String dbUsername;
-
-    @Value("${spring.datasource.password}")
-    private String dbPassword;
-
-    @Value("${backup.postgres.container-name:ssew-postgres}")
-    private String containerName;
 
     @Value("${backup.s3.folder:database-backups}")
     private String backupFolder;
@@ -101,7 +94,7 @@ public class DatabaseBackupService {
         Path compressedFile = null;
 
         try {
-            log.info("Step 1/5: Creating PostgreSQL backup from container '{}'", containerName);
+            log.info("Step 1/5: Creating PostgreSQL backup using pg_dump");
             tempBackupFile = createDatabaseDump(backupFileName);
             log.info("Backup file created: {} (size: {} bytes)",
                     tempBackupFile.getFileName(), Files.size(tempBackupFile));
@@ -133,34 +126,111 @@ public class DatabaseBackupService {
     }
 
     /**
-     * Creates database dump using Docker exec
+     * Creates database dump using pg_dump command via Runtime.exec
+     * This connects to the PostgreSQL container from within the commerce-service container
      */
     private Path createDatabaseDump(String filename) throws IOException, InterruptedException {
         Path tempFile = Files.createTempFile("db_backup_", ".sql");
 
+        String jdbcUrl = extractJdbcUrl();
+        String host = extractHost(jdbcUrl);
+        String port = extractPort(jdbcUrl);
+        String database = extractDatabase(jdbcUrl);
+
+        log.info("Connecting to PostgreSQL at {}:{}/{}", host, port, database);
+
+        String password = extractPassword();
+
         ProcessBuilder processBuilder = new ProcessBuilder(
-                "docker", "exec", containerName,
-                "pg_dumpall", "-U", dbUsername
+                "pg_dump",
+                "-h", host,
+                "-p", port,
+                "-U", dbUsername,
+                "-d", database,
+                "--format=plain",
+                "--no-owner",
+                "--no-acl"
         );
 
+        processBuilder.environment().put("PGPASSWORD", password);
         processBuilder.redirectOutput(tempFile.toFile());
-        processBuilder.redirectErrorStream(true);
+        processBuilder.redirectErrorStream(false);
 
+        Path errorFile = Files.createTempFile("db_backup_error_", ".log");
+        processBuilder.redirectError(errorFile.toFile());
+
+        log.debug("Executing pg_dump command...");
         Process process = processBuilder.start();
-        boolean finished = process.waitFor(10, TimeUnit.MINUTES);
+        boolean finished = process.waitFor(10, java.util.concurrent.TimeUnit.MINUTES);
 
         if (!finished) {
             process.destroyForcibly();
+            cleanupTempFiles(errorFile);
             throw new IOException("Database dump timed out after 10 minutes");
         }
 
         int exitCode = process.exitValue();
         if (exitCode != 0) {
-            String errorOutput = Files.readString(tempFile);
+            String errorOutput = Files.readString(errorFile);
+            cleanupTempFiles(errorFile);
             throw new IOException("Database dump failed with exit code " + exitCode + ": " + errorOutput);
         }
 
+        cleanupTempFiles(errorFile);
+
         return tempFile;
+    }
+
+    /**
+     * Extract JDBC URL from datasource
+     */
+    private String extractJdbcUrl() {
+        try (Connection conn = dataSource.getConnection()) {
+            return conn.getMetaData().getURL();
+        } catch (Exception e) {
+            throw new RuntimeException("Failed to extract JDBC URL", e);
+        }
+    }
+
+    /**
+     * Extract password from datasource connection
+     */
+    private String extractPassword() {
+        try (Connection conn = dataSource.getConnection()) {
+            return System.getenv("SPRING_DATASOURCE_PASSWORD");
+        } catch (Exception e) {
+            throw new RuntimeException("Failed to extract database password", e);
+        }
+    }
+
+    /**
+     * Extract host from JDBC URL
+     */
+    private String extractHost(String jdbcUrl) {
+        String[] parts = jdbcUrl.split("//")[1].split("/")[0].split(":");
+        return parts[0];
+    }
+
+    /**
+     * Extract port from JDBC URL
+     */
+    private String extractPort(String jdbcUrl) {
+        String hostPart = jdbcUrl.split("//")[1].split("/")[0];
+        if (hostPart.contains(":")) {
+            return hostPart.split(":")[1];
+        }
+        return "5432";
+    }
+
+    /**
+     * Extract database name from JDBC URL
+     */
+    private String extractDatabase(String jdbcUrl) {
+        String dbPart = jdbcUrl.split("//")[1].split("/")[1];
+        if (dbPart.contains("?")) {
+            dbPart = dbPart.split("\\?")[0];
+        }
+        return dbPart;
     }
 
     /**
@@ -212,7 +282,7 @@ public class DatabaseBackupService {
 
             List<S3Object> sortedObjects = listResponse.contents().stream()
                     .sorted(Comparator.comparing(S3Object::lastModified))
-                    .toList();
+                    .collect(Collectors.toList());
 
             int totalBackups = sortedObjects.size();
             int backupsToDelete = totalBackups - backupsToKeep;

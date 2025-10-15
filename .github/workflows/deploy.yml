@@ -114,6 +114,10 @@ jobs:
             WORKER_POOL_SIZE=100
             REDIS_POOL_SIZE=50
             REDIS_MIN_IDLE_CONNS=10
+            BACKUP_ENABLED=true
+            BACKUP_SCHEDULE=0 0 3 * * *
+            BACKUP_S3_FOLDER=database-backups
+            BACKUP_RETENTION_COUNT=3
             EOF
 
             FRESH_DEPLOY="${{ github.event.inputs.fresh_deploy || 'false' }}"
