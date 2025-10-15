@@ -118,15 +118,26 @@ jobs:
             if [ "$FRESH_DEPLOY" = "true" ]; then
               echo "🔥 Fresh deployment requested - removing all data and containers"
               docker-compose down -v
+              echo "🚀 Starting all services fresh..."
+              docker-compose up -d
+            else
+              echo "🔄 Ensuring postgres and redis are running..."
+              docker-compose up -d postgres redis
+              
+              echo "⏳ Waiting for dependencies to be healthy..."
+              sleep 10
+              
+              echo "🗑️ Removing old commerce-service container..."
+              docker-compose rm -sf commerce-service
+              
+              echo "📥 Pulling latest commerce-service image..."
+              docker pull ${{ env.IMAGE_NAME }}:prod-${{ steps.build-number.outputs.BUILD_NUMBER }}
+              
+              echo "🚀 Starting commerce-service with new image..."
+              docker-compose up -d commerce-service
             fi
             
-            echo "📥 pulling latest commerce-service image..."
-            docker-compose pull commerce-service
-            
-            echo "🔄 recreating commerce-service container..."
-            docker-compose up -d --force-recreate --no-deps commerce-service
-            
-            echo "🧹 removing old/unused docker images (older than 1 hour)..."
+            echo "🧹 Removing old/unused docker images (older than 1 hour)..."
             docker image prune -af --filter "until=1h"
             
             echo "✅ Deployment complete. Current status:"
