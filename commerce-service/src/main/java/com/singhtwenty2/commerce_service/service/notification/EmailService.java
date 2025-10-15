@@ -38,11 +38,14 @@ public class EmailService {
     @Value("${email.from:srishastaengineeringworks1991@gmail.com}")
     private String fromEmail;
 
-    @Value("${email.admin:mrysg.test@gmail.com}")
+    @Value("${email.admin:srishastaengineeringworks2025@gmail.com}")
     private String adminEmail;
 
     @Value("${email.admin:testrk33@gmail.com}")
-    private String frotendDevEmail;
+    private String frontendDevEmail;
+
+    @Value("${email.admin:mrysg.test@gmail.com}")
+    private String backendDevEmail;
 
     @Value("${company.name:Sri Shasta Engineering Works}")
     private String companyName;
@@ -89,7 +92,8 @@ public class EmailService {
         helper.setFrom(fromEmail);
         helper.setTo(event.getRecipientEmail());
 
-        helper.addCc(frotendDevEmail);
+        helper.addCc(frontendDevEmail);
+        helper.addCc(backendDevEmail);
 
         helper.setSubject("New Order Received - Order #" + metadata.getOrderId().substring(0, 8));
         helper.setText(htmlContent, true);
