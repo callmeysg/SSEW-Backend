@@ -10,16 +10,23 @@
 # @since 2025
 #
 
-FROM openjdk:21-jdk-slim
+FROM maven:3.9-eclipse-temurin-21-alpine AS build
+WORKDIR /app
+COPY pom.xml .
+RUN mvn dependency:go-offline
+COPY src ./src
+RUN mvn clean package -DskipTests
 
-RUN apt-get update && apt-get install -y curl && rm -rf /var/lib/apt/lists/*
-
+FROM eclipse-temurin:21-jre-alpine
 WORKDIR /app
 
 RUN apk add --no-cache postgresql-client
 
-COPY target/*.jar app.jar
+COPY --from=build /app/target/*.jar app.jar
 
 EXPOSE 9000
+
+HEALTHCHECK --interval=30s --timeout=10s --start-period=40s --retries=3 \
+  CMD wget --no-verbose --tries=1 --spider http://localhost:9000/actuator/health || exit 1
 
 ENTRYPOINT ["java", "-jar", "app.jar"]
