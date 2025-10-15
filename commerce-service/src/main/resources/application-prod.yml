@@ -76,6 +76,16 @@ aws:
   accessKey: ${AWS_ACCESS_KEY_ID}
   secretKey: ${AWS_SECRET_ACCESS_KEY}
 
+backup:
+  enabled: ${BACKUP_ENABLED:true}
+  schedule: ${BACKUP_SCHEDULE:0 0 3 * * *}
+  postgres:
+    container-name: ${BACKUP_POSTGRES_CONTAINER_NAME:ssew-postgres}
+  s3:
+    folder: ${BACKUP_S3_FOLDER:database-backups}
+  retention:
+    count: ${BACKUP_RETENTION_COUNT:3}
+
 sentry:
   dsn: ${SENTRY_DSN}
   send-default-pii: false
