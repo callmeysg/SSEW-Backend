@@ -15,6 +15,9 @@ import (
 	"encoding/json"
 	"fmt"
 	"log"
+	"net/url"
+	"strconv"
+	"strings"
 	"time"
 
 	"github.com/callmeysg/SSEW-Backend/telemetry-service/internal/config"
@@ -27,9 +30,9 @@ type RedisEventRepository struct {
 }
 
 func NewRedisEventRepository(redisURL string) (*RedisEventRepository, error) {
-	opt, err := redis.ParseURL(redisURL)
+	opt, err := parseRedisURL(redisURL)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("failed to parse Redis URL: %w", err)
 	}
 
 	opt.PoolSize = config.AppConfig.RedisPoolSize
@@ -47,9 +50,45 @@ func NewRedisEventRepository(redisURL string) (*RedisEventRepository, error) {
 		return nil, fmt.Errorf("failed to connect to Redis: %w", err)
 	}
 
+	log.Printf("Successfully connected to Redis at %s", opt.Addr)
+
 	return &RedisEventRepository{
 		client: client,
 	}, nil
+}
+
+func parseRedisURL(redisURL string) (*redis.Options, error) {
+	u, err := url.Parse(redisURL)
+	if err != nil {
+		return nil, fmt.Errorf("invalid Redis URL: %w", err)
+	}
+
+	opt := &redis.Options{
+		Addr: "localhost:6379",
+		DB:   0,
+	}
+
+	if u.Host != "" {
+		opt.Addr = u.Host
+	}
+
+	if u.User != nil {
+		if password, ok := u.User.Password(); ok {
+			opt.Password = password
+		}
+	}
+
+	if u.Path != "" {
+		path := strings.TrimPrefix(u.Path, "/")
+		if path != "" {
+			db, err := strconv.Atoi(path)
+			if err == nil {
+				opt.DB = db
+			}
+		}
+	}
+
+	return opt, nil
 }
 
 func (r *RedisEventRepository) Ping(ctx context.Context) error {
