@@ -75,6 +75,38 @@ public class OrderController {
         );
     }
 
+    @PostMapping("/pickup")
+    @PreAuthorize("hasRole('USER') or hasRole('ADMIN')")
+    public ResponseEntity<GlobalApiResponse<OrderResponse>> createPickupOrder(
+            @Valid @RequestBody CreatePickupOrderRequest createRequest,
+            Authentication authentication,
+            HttpServletRequest request
+    ) {
+        String userId = AuthenticationUtils.extractUserId(authentication, request, "create pickup order");
+        if (userId == null) {
+            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(
+                    GlobalApiResponse.<OrderResponse>builder()
+                            .success(false)
+                            .message("Unauthorized access")
+                            .build()
+            );
+        }
+
+        log.info("Pickup order creation attempt from IP: {} for user: {}", getClientIP(request), userId);
+
+        OrderResponse response = orderService.createPickupOrder(createRequest, userId);
+
+        log.info("Pickup order created successfully with ID: {}", response.getOrderId());
+
+        return ResponseEntity.status(HttpStatus.CREATED).body(
+                GlobalApiResponse.<OrderResponse>builder()
+                        .success(true)
+                        .message("Pickup order created successfully")
+                        .data(response)
+                        .build()
+        );
+    }
+
     @GetMapping("/{orderId}")
     @PreAuthorize("hasRole('USER') or hasRole('ADMIN')")
     public ResponseEntity<GlobalApiResponse<OrderResponse>> getOrderById(
@@ -300,7 +332,7 @@ public class OrderController {
 
     @PostMapping("/buy-again")
     @PreAuthorize("hasRole('USER') or hasRole('ADMIN')")
-    public ResponseEntity<GlobalApiResponse<Map<String, Object>>> buyAgain(
+    public ResponseEntity<GlobalApiResponse<OrderResponse>> buyAgain(
             @Valid @RequestBody BuyAgainRequest buyAgainRequest,
             Authentication authentication,
             HttpServletRequest request
@@ -308,7 +340,7 @@ public class OrderController {
         String userId = AuthenticationUtils.extractUserId(authentication, request, "buy again");
         if (userId == null) {
             return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(
-                    GlobalApiResponse.<Map<String, Object>>builder()
+                    GlobalApiResponse.<OrderResponse>builder()
                             .success(false)
                             .message("Unauthorized access")
                             .build()
@@ -318,15 +350,15 @@ public class OrderController {
         log.info("Buy again request from IP: {} for order ID: {} by user: {}",
                 getClientIP(request), buyAgainRequest.getOrderId(), userId);
 
-        Map<String, Object> response = orderService.buyAgain(buyAgainRequest, userId);
+        OrderResponse response = orderService.buyAgain(buyAgainRequest, userId);
 
         log.info("Buy again completed successfully for order ID: {} by user: {}",
                 buyAgainRequest.getOrderId(), userId);
 
         return ResponseEntity.ok(
-                GlobalApiResponse.<Map<String, Object>>builder()
+                GlobalApiResponse.<OrderResponse>builder()
                         .success(true)
-                        .message("Items added to cart successfully")
+                        .message("Order placed successfully using buy again")
                         .data(response)
                         .build()
         );

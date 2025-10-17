@@ -16,6 +16,7 @@ import com.singhtwenty2.commerce_service.data.dto.notification.EmailEvent;
 import com.singhtwenty2.commerce_service.data.entity.*;
 import com.singhtwenty2.commerce_service.data.enums.CartType;
 import com.singhtwenty2.commerce_service.data.enums.OrderStatus;
+import com.singhtwenty2.commerce_service.data.enums.OrderType;
 import com.singhtwenty2.commerce_service.data.repository.CartRepository;
 import com.singhtwenty2.commerce_service.data.repository.OrderRepository;
 import com.singhtwenty2.commerce_service.data.repository.UserRepository;
@@ -39,7 +40,6 @@ import org.springframework.web.server.ResponseStatusException;
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
-import java.util.HashMap;
 import java.util.Map;
 import java.util.UUID;
 import java.util.stream.Collectors;
@@ -82,6 +82,29 @@ public class OrderServiceImpl implements OrderService {
         publishNewOrderEmailEvent(savedOrder);
 
         log.info("Order created successfully with ID: {}", savedOrder.getId());
+        return buildOrderResponse(savedOrder);
+    }
+
+    @Override
+    public OrderResponse createPickupOrder(CreatePickupOrderRequest createRequest, String userId) {
+        log.debug("Creating pickup order for user: {} from cart: {}", userId, createRequest.getCartId());
+
+        User user = findUserById(userId);
+        Cart cart = findCartById(createRequest.getCartId(), user.getId());
+
+        validateCartForOrder(cart);
+        Order savedOrder = createPickupOrderFromCart(createRequest, user, cart);
+        clearCart(cart);
+
+        telemetryClientService.publishNewOrderEventForAdmin(
+                savedOrder.getId().toString(),
+                savedOrder.getCustomerName(),
+                savedOrder.getTotalAmount().toString()
+        );
+
+        publishNewOrderEmailEvent(savedOrder);
+
+        log.info("Pickup order created successfully with ID: {}", savedOrder.getId());
         return buildOrderResponse(savedOrder);
     }
 
@@ -267,27 +290,80 @@ public class OrderServiceImpl implements OrderService {
     }
 
     @Override
-    public Map<String, Object> buyAgain(BuyAgainRequest buyAgainRequest, String userId) {
+    public OrderResponse buyAgain(BuyAgainRequest buyAgainRequest, String userId) {
         log.debug("Processing buy again request for order: {} by user: {}", buyAgainRequest.getOrderId(), userId);
         UUID userUuid = parseUUID(userId, "Invalid user ID format");
-        Order order = findOrderByIdAndUserId(buyAgainRequest.getOrderId(), userUuid);
-        Cart cart = findOrCreateUserCart(userUuid);
+        Order previousOrder = findOrderByIdAndUserId(buyAgainRequest.getOrderId(), userUuid);
+
+        User user = previousOrder.getUser();
+
+        Order newOrder = new Order();
+        newOrder.setUser(user);
+        newOrder.setCustomerName(previousOrder.getCustomerName());
+        newOrder.setPhoneNumber(previousOrder.getPhoneNumber());
+        newOrder.setOrderType(previousOrder.getOrderType());
+        newOrder.setStatus(OrderStatus.PLACED);
+        newOrder.setStatusUpdatedAt(LocalDateTime.now());
+
+        if (previousOrder.getOrderType() == OrderType.DELIVERY) {
+            newOrder.setStreetAddress(previousOrder.getStreetAddress());
+            newOrder.setCity(previousOrder.getCity());
+            newOrder.setState(previousOrder.getState());
+            newOrder.setPincode(previousOrder.getPincode());
+        }
+
+        BigDecimal totalAmount = BigDecimal.ZERO;
+        int totalItems = 0;
         int itemsAdded = 0;
-        for (OrderItem orderItem : order.getOrderItems()) {
+
+        for (OrderItem previousItem : previousOrder.getOrderItems()) {
             try {
-                addToCart(cart, orderItem.getProduct(), orderItem.getQuantity());
-                itemsAdded++;
+                Product product = previousItem.getProduct();
+                if (product.getIsActive()) {
+                    OrderItem newOrderItem = new OrderItem(
+                            product,
+                            previousItem.getQuantity(),
+                            product.getPrice()
+                    );
+                    newOrder.addOrderItem(newOrderItem);
+                    totalAmount = totalAmount.add(newOrderItem.getTotalPrice());
+                    totalItems += previousItem.getQuantity();
+                    itemsAdded++;
+                } else {
+                    log.warn("Product {} is inactive, skipping in buy again", product.getSku());
+                }
             } catch (Exception e) {
-                log.warn("Failed to add product {} to cart during buy again: {}",
-                        orderItem.getProductSku(), e.getMessage());
+                log.warn("Failed to add product {} to new order during buy again: {}",
+                        previousItem.getProductSku(), e.getMessage());
             }
         }
-        Map<String, Object> response = new HashMap<>();
-        response.put("cart_id", cart.getId().toString());
-        response.put("items_added", itemsAdded);
-        response.put("total_items_requested", order.getOrderItems().size());
-        log.info("Buy again completed for order: {} - {} items added to cart", order.getId(), itemsAdded);
-        return response;
+
+        if (itemsAdded == 0) {
+            throw new ResponseStatusException(
+                    HttpStatus.BAD_REQUEST,
+                    "No active products available from previous order to reorder"
+            );
+        }
+
+        newOrder.setTotalAmount(totalAmount);
+        newOrder.setTotalItems(totalItems);
+
+        Order savedOrder = orderRepository.save(newOrder);
+        savedOrder.updateStatus(OrderStatus.PLACED, "Order placed via buy again", false);
+        Order finalOrder = orderRepository.save(savedOrder);
+
+        telemetryClientService.publishNewOrderEventForAdmin(
+                finalOrder.getId().toString(),
+                finalOrder.getCustomerName(),
+                finalOrder.getTotalAmount().toString()
+        );
+
+        publishNewOrderEmailEvent(finalOrder);
+
+        log.info("Buy again completed for order: {} - new order {} created with {} items",
+                previousOrder.getId(), finalOrder.getId(), itemsAdded);
+
+        return buildOrderResponse(finalOrder);
     }
 
     @Override
@@ -344,19 +420,6 @@ public class OrderServiceImpl implements OrderService {
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Order not found"));
     }
 
-    private Cart findOrCreateUserCart(UUID userId) {
-        return cartRepository.findByUserIdAndCartTypeAndIsActiveTrue(userId, CartType.CART)
-                .orElseGet(() -> {
-                    User user = userRepository.findById(userId)
-                            .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "User not found"));
-                    Cart newCart = new Cart();
-                    newCart.setUser(user);
-                    newCart.setCartType(CartType.CART);
-                    newCart.setIsActive(true);
-                    return cartRepository.save(newCart);
-                });
-    }
-
     private void validateCartForOrder(Cart cart) {
         if (cart.getCartItems().isEmpty()) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Cart is empty");
@@ -376,6 +439,7 @@ public class OrderServiceImpl implements OrderService {
         order.setUser(user);
         order.setCustomerName(createRequest.getCustomerName());
         order.setPhoneNumber(createRequest.getPhoneNumber());
+        order.setOrderType(OrderType.DELIVERY);
         order.setStreetAddress(createRequest.getStreetAddress());
         order.setCity(createRequest.getCity());
         order.setState(createRequest.getState());
@@ -401,26 +465,35 @@ public class OrderServiceImpl implements OrderService {
         return orderRepository.save(savedOrder);
     }
 
-    private void clearCart(Cart cart) {
-        cart.getCartItems().clear();
-        cartRepository.save(cart);
+    private Order createPickupOrderFromCart(CreatePickupOrderRequest createRequest, User user, Cart cart) {
+        Order order = new Order();
+        order.setUser(user);
+        order.setCustomerName(createRequest.getCustomerName());
+        order.setPhoneNumber(createRequest.getPhoneNumber());
+        order.setOrderType(OrderType.PICKUP);
+        order.setStatus(OrderStatus.PLACED);
+        order.setStatusUpdatedAt(LocalDateTime.now());
+        BigDecimal totalAmount = BigDecimal.ZERO;
+        int totalItems = 0;
+        for (CartItem cartItem : cart.getCartItems()) {
+            OrderItem orderItem = new OrderItem(
+                    cartItem.getProduct(),
+                    cartItem.getQuantity(),
+                    cartItem.getPriceAtTime()
+            );
+            order.addOrderItem(orderItem);
+            totalAmount = totalAmount.add(orderItem.getTotalPrice());
+            totalItems += cartItem.getQuantity();
+        }
+        order.setTotalAmount(totalAmount);
+        order.setTotalItems(totalItems);
+        Order savedOrder = orderRepository.save(order);
+        savedOrder.updateStatus(OrderStatus.PLACED, "Pickup order placed successfully", false);
+        return orderRepository.save(savedOrder);
     }
 
-    private void addToCart(Cart cart, Product product, Integer quantity) {
-        cart.getCartItems().stream()
-                .filter(item -> item.getProduct().getId().equals(product.getId()))
-                .findFirst()
-                .ifPresentOrElse(
-                        existingItem -> existingItem.increaseQuantity(quantity),
-                        () -> {
-                            CartItem newItem = new CartItem();
-                            newItem.setCart(cart);
-                            newItem.setProduct(product);
-                            newItem.setQuantity(quantity);
-                            newItem.setPriceAtTime(product.getPrice());
-                            cart.addCartItem(newItem);
-                        }
-                );
+    private void clearCart(Cart cart) {
+        cart.getCartItems().clear();
         cartRepository.save(cart);
     }
 
@@ -443,6 +516,7 @@ public class OrderServiceImpl implements OrderService {
                 .userId(order.getUser().getId().toString())
                 .customerName(order.getCustomerName())
                 .phoneNumber(order.getPhoneNumber())
+                .orderType(order.getOrderType())
                 .streetAddress(order.getStreetAddress())
                 .city(order.getCity())
                 .state(order.getState())
@@ -467,6 +541,7 @@ public class OrderServiceImpl implements OrderService {
         return OrderSummaryResponse.builder()
                 .orderId(order.getId().toString())
                 .customerName(order.getCustomerName())
+                .orderType(order.getOrderType())
                 .status(order.getStatus())
                 .totalAmount(order.getTotalAmount())
                 .totalItems(order.getTotalItems())

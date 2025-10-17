@@ -12,6 +12,7 @@
 package com.singhtwenty2.commerce_service.data.dto.order_mangement;
 
 import com.singhtwenty2.commerce_service.data.enums.OrderStatus;
+import com.singhtwenty2.commerce_service.data.enums.OrderType;
 import com.singhtwenty2.commerce_service.data.validation.ValidOrderStatus;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
@@ -58,6 +59,26 @@ public class OrderDTO {
         @NotBlank(message = "Pincode is required")
         @Pattern(regexp = "^[1-9]\\d{5}$", message = "Invalid pincode format")
         private String pincode;
+    }
+
+    @Setter
+    @Getter
+    @Data
+    @Builder
+    @AllArgsConstructor
+    @NoArgsConstructor
+    public static class CreatePickupOrderRequest {
+
+        @NotBlank(message = "Cart ID is required")
+        private String cartId;
+
+        @NotBlank(message = "Customer name is required")
+        @Size(max = 100, message = "Customer name must not exceed 100 characters")
+        private String customerName;
+
+        @NotBlank(message = "Phone number is required")
+        @Pattern(regexp = "^[6-9]\\d{9}$", message = "Invalid Indian phone number format")
+        private String phoneNumber;
     }
 
     @Setter
@@ -120,6 +141,7 @@ public class OrderDTO {
         private String userId;
         private String customerName;
         private String phoneNumber;
+        private OrderType orderType;
         private String streetAddress;
         private String city;
         private String state;
@@ -148,6 +170,7 @@ public class OrderDTO {
     public static class OrderSummaryResponse {
         private String orderId;
         private String customerName;
+        private OrderType orderType;
         private OrderStatus status;
         private BigDecimal totalAmount;
         private Integer totalItems;

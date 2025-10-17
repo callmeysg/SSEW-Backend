@@ -11,17 +11,16 @@
  */
 package com.singhtwenty2.commerce_service.service.order_mangement;
 
+import com.singhtwenty2.commerce_service.data.dto.order_mangement.OrderDTO.*;
 import com.singhtwenty2.commerce_service.data.enums.OrderStatus;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 
-import java.util.Map;
-
-import static com.singhtwenty2.commerce_service.data.dto.order_mangement.OrderDTO.*;
-
 public interface OrderService {
 
     OrderResponse createOrder(CreateOrderRequest createRequest, String userId);
+
+    OrderResponse createPickupOrder(CreatePickupOrderRequest createRequest, String userId);
 
     OrderResponse getOrderById(String orderId, String userId);
 
@@ -39,7 +38,7 @@ public interface OrderService {
 
     void deleteOrder(String orderId);
 
-    Map<String, Object> buyAgain(BuyAgainRequest buyAgainRequest, String userId);
+    OrderResponse buyAgain(BuyAgainRequest buyAgainRequest, String userId);
 
     AdminOrderStatistics getOrderStatistics();
 

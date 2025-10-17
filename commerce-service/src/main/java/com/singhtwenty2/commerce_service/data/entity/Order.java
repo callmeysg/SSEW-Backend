@@ -12,6 +12,7 @@
 package com.singhtwenty2.commerce_service.data.entity;
 
 import com.singhtwenty2.commerce_service.data.enums.OrderStatus;
+import com.singhtwenty2.commerce_service.data.enums.OrderType;
 import jakarta.persistence.*;
 import lombok.AllArgsConstructor;
 import lombok.Getter;
@@ -32,7 +33,8 @@ import java.util.List;
                 @Index(name = "idx_order_created", columnList = "created_at"),
                 @Index(name = "idx_order_user_status", columnList = "user_id, status"),
                 @Index(name = "idx_order_user_created", columnList = "user_id, created_at DESC"),
-                @Index(name = "idx_order_phone", columnList = "phone_number")
+                @Index(name = "idx_order_phone", columnList = "phone_number"),
+                @Index(name = "idx_order_type", columnList = "order_type")
         }
 )
 @Getter
@@ -51,19 +53,23 @@ public class Order extends BaseEntity {
     @Column(name = "phone_number", nullable = false, length = 15)
     private String phoneNumber;
 
-    @Column(name = "street_address", nullable = false, length = 300)
+    @Enumerated(EnumType.STRING)
+    @Column(name = "order_type", nullable = false, length = 20)
+    private OrderType orderType = OrderType.DELIVERY;
+
+    @Column(name = "street_address", length = 300)
     private String streetAddress;
 
-    @Column(name = "city", nullable = false, length = 100)
+    @Column(name = "city", length = 100)
     private String city;
 
-    @Column(name = "state", nullable = false, length = 50)
+    @Column(name = "state", length = 50)
     private String state;
 
-    @Column(name = "pincode", nullable = false, length = 10)
+    @Column(name = "pincode", length = 10)
     private String pincode;
 
-    @Column(name = "full_address", nullable = false, length = 500)
+    @Column(name = "full_address", length = 500)
     private String fullAddress;
 
     @Enumerated(EnumType.STRING)
@@ -150,21 +156,36 @@ public class Order extends BaseEntity {
         return status == OrderStatus.SHIPPED;
     }
 
+    public boolean isPickupOrder() {
+        return orderType == OrderType.PICKUP;
+    }
+
+    public boolean isDeliveryOrder() {
+        return orderType == OrderType.DELIVERY;
+    }
+
     public String getFormattedAddress() {
+        if (orderType == OrderType.PICKUP) {
+            return "Pickup Order - No Address Required";
+        }
         return String.format("%s, %s, %s - %s", streetAddress, city, state, pincode);
     }
 
     @PrePersist
     private void generateFullAddress() {
-        if (streetAddress != null && city != null && state != null && pincode != null) {
+        if (orderType == OrderType.DELIVERY && streetAddress != null && city != null && state != null && pincode != null) {
             this.fullAddress = getFormattedAddress();
+        } else if (orderType == OrderType.PICKUP) {
+            this.fullAddress = "Pickup Order - No Address Required";
         }
     }
 
     @PreUpdate
     private void updateFullAddress() {
-        if (streetAddress != null && city != null && state != null && pincode != null) {
+        if (orderType == OrderType.DELIVERY && streetAddress != null && city != null && state != null && pincode != null) {
             this.fullAddress = getFormattedAddress();
+        } else if (orderType == OrderType.PICKUP) {
+            this.fullAddress = "Pickup Order - No Address Required";
         }
     }
 }
