@@ -88,14 +88,14 @@ public class ProductServiceImpl implements ProductService {
             }
         }
 
-        validationService.validateProductData(request, null);
+        validationService.validateProductData(request, manufacturer);
 
         Product product = new Product();
         mappingService.mapCreateRequestToProduct(request, product, manufacturer, parentProduct);
 
         String sku = skuGeneratorService.generateUniqueSku(manufacturer, parentProduct, request.getName());
         product.setSku(sku);
-        product.setSlug(generateUniqueSlug(request.getName()));
+        product.setSlug(generateUniqueSlug(request.getName(), manufacturer.getName()));
 
         if (request.getCompatibilityBrandIds() != null && !request.getCompatibilityBrandIds().isEmpty()) {
             attachCompatibilityBrands(product, request.getCompatibilityBrandIds());
@@ -126,12 +126,17 @@ public class ProductServiceImpl implements ProductService {
         }
 
         Manufacturer manufacturer = parentProduct.getManufacturer();
+
+        if (productRepository.existsByNameAndManufacturerId(request.getName(), manufacturer.getId())) {
+            throw new BusinessException("Product with name '" + request.getName() + "' already exists for this manufacturer");
+        }
+
         Product variant = new Product();
         mappingService.mapVariantRequestToProduct(request, variant, manufacturer);
 
         String sku = skuGeneratorService.generateUniqueSku(manufacturer, parentProduct, request.getName());
         variant.setSku(sku);
-        variant.setSlug(generateUniqueSlug(request.getName()));
+        variant.setSlug(generateUniqueSlug(request.getName(), manufacturer.getName()));
         variant.setParentProduct(parentProduct);
         variant.setVariantType(VariantType.VARIANT);
 
@@ -180,14 +185,16 @@ public class ProductServiceImpl implements ProductService {
         Product product = productRepository.findById(UUID.fromString(productId))
                 .orElseThrow(() -> new ResourceNotFoundException("Product not found with ID: " + productId));
 
-        validationService.validateProductUpdateData(request, product);
-        mappingService.mapUpdateRequestToProduct(request, product);
-
         if (request.getManufacturerId() != null && !request.getManufacturerId().equals(product.getManufacturer().getId().toString())) {
             Manufacturer newManufacturer = manufacturerRepository.findById(UUID.fromString(request.getManufacturerId()))
                     .orElseThrow(() -> new ResourceNotFoundException("Manufacturer not found"));
+            validationService.validateProductUpdateDataWithManufacturerChange(request, product, newManufacturer);
             product.setManufacturer(newManufacturer);
+        } else {
+            validationService.validateProductUpdateData(request, product);
         }
+
+        mappingService.mapUpdateRequestToProduct(request, product);
 
         if (request.getCompatibilityBrandIds() != null) {
             product.clearCompatibilityBrands();
@@ -454,13 +461,13 @@ public class ProductServiceImpl implements ProductService {
         compatibilityBrands.forEach(product::addCompatibilityBrand);
     }
 
-    private String generateUniqueSlug(String name) {
-        String baseSlug = slugGenerator.generateSlug(name);
+    private String generateUniqueSlug(String productName, String manufacturerName) {
+        String baseSlug = slugGenerator.generateSlug(productName);
         String uniqueSlug = baseSlug;
         int counter = 1;
 
         while (productRepository.existsBySlug(uniqueSlug)) {
-            uniqueSlug = baseSlug + "-" + counter++;
+            uniqueSlug = baseSlug + "-" + slugGenerator.generateSlug(manufacturerName) + "-" + counter++;
         }
 
         return uniqueSlug;

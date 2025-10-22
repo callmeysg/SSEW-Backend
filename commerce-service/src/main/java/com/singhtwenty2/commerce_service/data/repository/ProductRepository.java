@@ -16,6 +16,7 @@ import com.singhtwenty2.commerce_service.data.enums.VariantType;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.JpaSpecificationExecutor;
 import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
 import java.math.BigDecimal;
@@ -37,6 +38,11 @@ public interface ProductRepository extends JpaRepository<Product, UUID>, JpaSpec
     boolean existsByName(String name);
 
     boolean existsByModelNumber(String modelNumber);
+
+    boolean existsByNameAndManufacturerId(String name, UUID manufacturerId);
+
+    @Query("SELECT CASE WHEN COUNT(p) > 0 THEN true ELSE false END FROM Product p WHERE p.name = :name AND p.manufacturer.id = :manufacturerId AND p.id != :productId")
+    boolean existsByNameAndManufacturerIdAndIdNot(@Param("name") String name, @Param("manufacturerId") UUID manufacturerId, @Param("productId") UUID productId);
 
     long countByIsActiveTrue();
 

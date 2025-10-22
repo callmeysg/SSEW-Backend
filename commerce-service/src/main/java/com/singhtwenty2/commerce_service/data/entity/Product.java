@@ -37,7 +37,8 @@ import java.util.Map;
                 @Index(name = "idx_product_parent", columnList = "parent_product_id"),
                 @Index(name = "idx_product_variant_type", columnList = "variant_type"),
                 @Index(name = "idx_product_price", columnList = "price"),
-                @Index(name = "idx_product_created", columnList = "created_at")
+                @Index(name = "idx_product_created", columnList = "created_at"),
+                @Index(name = "idx_product_manufacturer_name", columnList = "manufacturer_id, name")
         }
 )
 @Getter

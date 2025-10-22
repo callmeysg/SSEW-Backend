@@ -11,6 +11,7 @@
  */
 package com.singhtwenty2.commerce_service.service.catalogue.helper;
 
+import com.singhtwenty2.commerce_service.data.entity.Manufacturer;
 import com.singhtwenty2.commerce_service.data.entity.Product;
 import com.singhtwenty2.commerce_service.data.repository.ProductRepository;
 import com.singhtwenty2.commerce_service.exception.BusinessException;
@@ -26,14 +27,14 @@ public class ProductValidationService {
 
     private final ProductRepository productRepository;
 
-    public void validateProductData(CreateProductRequest request, Product existingProduct) {
-        if (request.getName() != null && (existingProduct == null || !request.getName().equals(existingProduct.getName()))) {
-            if (productRepository.existsByName(request.getName())) {
-                throw new BusinessException("Product with this name already exists");
+    public void validateProductData(CreateProductRequest request, Manufacturer manufacturer) {
+        if (request.getName() != null) {
+            if (productRepository.existsByNameAndManufacturerId(request.getName(), manufacturer.getId())) {
+                throw new BusinessException("Product with name '" + request.getName() + "' already exists for this manufacturer");
             }
         }
 
-        if (request.getModelNumber() != null && (existingProduct == null || !request.getModelNumber().equals(existingProduct.getModelNumber()))) {
+        if (request.getModelNumber() != null) {
             if (productRepository.existsByModelNumber(request.getModelNumber())) {
                 throw new BusinessException("Product with this model number already exists");
             }
@@ -42,9 +43,23 @@ public class ProductValidationService {
 
     public void validateProductUpdateData(UpdateProductRequest request, Product existingProduct) {
         if (request.getName() != null && !request.getName().equals(existingProduct.getName())) {
-            if (productRepository.existsByName(request.getName())) {
-                throw new BusinessException("Product with this name already exists");
+            if (productRepository.existsByNameAndManufacturerId(request.getName(), existingProduct.getManufacturer().getId())) {
+                throw new BusinessException("Product with name '" + request.getName() + "' already exists for this manufacturer");
             }
+        }
+
+        if (request.getModelNumber() != null && !request.getModelNumber().equals(existingProduct.getModelNumber())) {
+            if (productRepository.existsByModelNumber(request.getModelNumber())) {
+                throw new BusinessException("Product with this model number already exists");
+            }
+        }
+    }
+
+    public void validateProductUpdateDataWithManufacturerChange(UpdateProductRequest request, Product existingProduct, Manufacturer newManufacturer) {
+        String nameToCheck = request.getName() != null ? request.getName() : existingProduct.getName();
+
+        if (productRepository.existsByNameAndManufacturerIdAndIdNot(nameToCheck, newManufacturer.getId(), existingProduct.getId())) {
+            throw new BusinessException("Product with name '" + nameToCheck + "' already exists for the new manufacturer");
         }
 
         if (request.getModelNumber() != null && !request.getModelNumber().equals(existingProduct.getModelNumber())) {
