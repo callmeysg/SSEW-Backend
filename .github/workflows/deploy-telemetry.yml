@@ -65,6 +65,7 @@ jobs:
           key: ${{ secrets.EC2_SSH_KEY }}
           script: |
             set -e
+            mkdir -p /home/ubuntu/ssew-deployment
             cd /home/ubuntu/ssew-deployment
 
             curl -o docker-compose.yml https://raw.githubusercontent.com/${{ github.repository }}/main/docker-compose.yml
